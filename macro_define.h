@@ -25,11 +25,11 @@ extern Size img_size; // defined in main.cpp
 
 #define NDEBUG_CL // COLOR
 #define NDEBUG_GR // GRADIENT
-// #define NDEBUG_IN // INITIAL
+#define NDEBUG_IN // INITIAL
 #define NDEBUG_TR // TRAIN
-//#define NDEBUG
+#define NDEBUG
 //#define NTIME
-#define HIGH_BOT
+// #define HIGH_BOT
 
 #define DTREE
 //#define LREGG

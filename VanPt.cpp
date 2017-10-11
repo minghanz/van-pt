@@ -1,6 +1,6 @@
 #include "VanPt.h"
 
-VanPt::VanPt()
+VanPt::VanPt(float alpha_w, float alpha_h) : ALPHA_W(alpha_w), ALPHA_H(alpha_h)
 {
 	#ifndef HIGH_BOT
 	y_bottom_warp = min(img_size.height * 14/15, img_size.height -1 );
@@ -16,11 +16,19 @@ VanPt::VanPt()
 		float van_pt_cali_x = 340;
     
         van_pt_cali = Point2f(van_pt_cali_x, van_pt_cali_y);
-        van_pt_ini = van_pt_cali;
-    
+		van_pt_ini = van_pt_cali;
+		theta_w = atan(tan(ALPHA_W)*((van_pt_ini.x - img_size.width/2)/(img_size.width/2))); 	// yaw angle 
+		theta_h = atan(tan(ALPHA_H)*((van_pt_ini.y - img_size.height/2)/(img_size.height/2)));	// pitch angle
+		theta_w_unfil = theta_w;
+		theta_h_unfil = theta_h;
         #else
         van_pt_ini = Point2f(img_size.width/2, img_size.height/2);
-        van_pt_cali = van_pt_ini;
+		van_pt_cali = van_pt_ini;
+
+		theta_w = 0; 	// yaw angle 
+		theta_h = 0;	// pitch angle
+		theta_w_unfil = 0;
+		theta_h_unfil = 0;
 		#endif
 		
 		{
@@ -58,6 +66,9 @@ VanPt::VanPt()
 		max_weight_left = 0;
 		max_weight_right = 0;
 		confidence = 0;
+		conf_weight = 0;
+		conf_mse = 0;
+		conf_dist = 0;
 		// kalman.init(2, 2, 0, CV_32F);
 		conf_gamma_x = 1.0/(20.0/(480.0*0.7)*y_bottom_warp_max);
 		conf_c_x_max = 100.0/(480.0*0.7)*y_bottom_warp_max;
@@ -71,6 +82,11 @@ VanPt::VanPt()
 		conf_gamma_e = 1.0/(20.0/(480.0*0.7)*y_bottom_warp_max);
 		conf_c_e = 30.0/(480.0*0.7)*y_bottom_warp_max;
 		#endif
+
+		ini_flag = false;
+		first_sucs = false;
+		sucs_before = false;
+		fail_ini_count = 0;
 }
 
 void VanPt::initialVan(Mat color_img, Mat image, Mat& warped_img)
@@ -132,6 +148,11 @@ void VanPt::initialVan(Mat color_img, Mat image, Mat& warped_img)
 
 	#else
 	ini_success = edgeVote(image, edges);
+	updateFlags();
+	if (first_sucs)
+	{
+		van_pt_ini = van_pt_obsv;
+	}
 	updateTrackVar();
 
 	#endif
@@ -267,6 +288,16 @@ bool VanPt::edgeVote(Mat image, Mat edges)
 
 	// track with Kalman
 	van_pt_ini = confidence*van_pt_obsv + (1-confidence)*van_pt_ini;
+
+	theta_w = atan(tan(ALPHA_W)*((van_pt_ini.x - img_size.width/2)/(img_size.width/2))); 	// yaw angle 
+	theta_h = atan(tan(ALPHA_H)*((van_pt_ini.y - img_size.height/2)/(img_size.height/2)));	// pitch angle
+	theta_w_unfil = atan(tan(ALPHA_W)*((van_pt_obsv.x - img_size.width/2)/(img_size.width/2))); 	// yaw angle 
+	theta_h_unfil = atan(tan(ALPHA_H)*((van_pt_obsv.y - img_size.height/2)/(img_size.height/2)));	// pitch angle
+	int fontFace = FONT_HERSHEY_SIMPLEX;
+	double fontScale = 0.5;
+	int thickness = 1;
+	string Text1 = "pitch: " + x2str(theta_h*180/CV_PI) + ", yaw: " + x2str(theta_w*180/CV_PI);
+	putText(vote_lines_img, Text1, Point(10, 140), fontFace, fontScale, Scalar(0,0,255), thickness, LINE_AA);
 	
 	return true;
 	
@@ -364,7 +395,7 @@ float VanPt::getConfidence(const vector<Point2f>& van_pt_candi, const vector<flo
 {
 	Point2f ref_pt = van_pt_ini; //van_pt_cali
 
-	float conf_weight, conf_mse, conf_dist;
+	
 
 	// conf_weight
 	float weight_left = 0, weight_right = 0;
@@ -385,19 +416,19 @@ float VanPt::getConfidence(const vector<Point2f>& van_pt_candi, const vector<flo
 	}
 	else if (weight_left > max_weight_left)
 	{
-		conf_weight = sqrt(weight_right / max_weight_right);
+		conf_weight = pow(weight_right / max_weight_right, 0.7);
 		max_weight_left = weight_left;
 		max_weight_right *= 0.99;
 	}
 	else if (weight_right > max_weight_right)
 	{
-		conf_weight = sqrt(weight_left / max_weight_left);
+		conf_weight = pow(weight_left / max_weight_left, 0.7);
 		max_weight_right = weight_right;
 		max_weight_left *= 0.99;
 	}
 	else 
 	{
-		conf_weight = sqrt(min(weight_left / max_weight_left, weight_right / max_weight_right) );
+		conf_weight = pow(min(weight_left / max_weight_left, weight_right / max_weight_right), 0.7 );
 		max_weight_left *= 0.99;
 		max_weight_right *= 0.99;
 	}
@@ -456,13 +487,40 @@ float VanPt::getConfidence(const vector<Point2f>& van_pt_candi, const vector<flo
 
 }
 
+
+void VanPt::updateFlags()
+{
+	if (ini_success && ( (confidence >= 0.01) || (!sucs_before && conf_mse >= 0.5) ) ) //  && conf_c_y <= 3*conf_c_y_min
+	{
+		if (!sucs_before){
+			first_sucs = true;}
+		else{
+			first_sucs = false;}
+		sucs_before = true;
+
+		fail_ini_count = max(0, fail_ini_count - 1);
+		if (fail_ini_count == 0)
+			ini_flag = true;
+	}
+	else
+	{
+		first_sucs = false;
+
+		fail_ini_count = min(10, fail_ini_count + 1);
+		if (fail_ini_count >= 5)
+		{
+			ini_flag = false;
+		}
+	}
+}
+
 void VanPt::updateTrackVar()
 {
 	if (!ini_success || confidence < 0.01)
 	{
 		conf_c_x = min(conf_c_x_max, float(1.1*conf_c_x));
 	}
-	else
+	else if (confidence >= 0.03)
 	{
 		conf_c_x = max(conf_c_x_min, float(0.9*conf_c_x));
 		conf_c_y = max(conf_c_y_min, float(0.9*conf_c_y));
@@ -1388,7 +1446,11 @@ void outputVideo(Mat image, Mat warped_img, VideoWriter& writer, const VanPt& va
 	circle(image, Point(van_pt.van_pt_ini), 5, color, thickness);
 
 	imshow("output", image);
+	#ifndef NDEBUG
 	waitKey(0);
+	#else
+	waitKey(1);
+	#endif
 
 	writer.write(image);
 	nframe ++;

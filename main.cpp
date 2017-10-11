@@ -56,7 +56,9 @@ int main(int argc, char** argv)
 	int msc[2], ispic, video_length;
 	import(argc, argv, file_name, image, reader, writer, msc, ispic, video_length);
 	cout << "Set time interval: [" << msc[0] <<", "<< msc[1] << "]" << endl;
-	// ofstream outfile("yaw angle.txt");
+	ofstream outfile("pitch angle 80.txt");
+	ofstream outfile2("pitch angle 80 unfiltered.txt");
+	
 	
 	/// initialize parameters that work cross frames 
 	clock_t t_start = clock();
@@ -64,7 +66,7 @@ int main(int argc, char** argv)
 	img_size = Size(reader.get(CV_CAP_PROP_FRAME_WIDTH), reader.get(CV_CAP_PROP_FRAME_HEIGHT));
 
 	float illu_comp = 1;
-	VanPt van_pt;
+	VanPt van_pt(alpha_w, alpha_h);
 	int nframe = 0;
 	
 	while (reader.isOpened())
@@ -95,10 +97,17 @@ int main(int argc, char** argv)
 				van_pt.initialVan(cali_image, gray, warped_img);
 
 				outputVideo(cali_image, warped_img, writer, van_pt, nframe);
+				if (van_pt.ini_success)
+				{
+					outfile << van_pt.theta_h << endl;
+					outfile2 << van_pt.theta_h_unfil << endl;
+				}
 		}
 		else
 		{
 			cout << "All frames processed. " << endl;
+			outfile.close();
+			outfile2.close();
 			break;
 		}
 	}

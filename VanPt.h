@@ -28,7 +28,7 @@ extern Size img_size; // defined in main.cpp
 class VanPt
 {
 public:
-    VanPt();
+    VanPt(float alpha_w, float alpha_h);
     void initialVan(Mat color_img, Mat gray, Mat& warped_img);
     void SteerFilter(Mat image, Mat& steer_resp, Mat& steer_angle_max, Mat& steer_resp_weight);
     void getSteerKernel(Mat& kernel_x, Mat& kernel_y, Mat& kernel_xy, int ksize, double sigma);
@@ -60,6 +60,11 @@ public:
 
     Mat vote_lines_img;
 
+    bool ini_flag;
+    bool first_sucs;
+    bool sucs_before;
+    int fail_ini_count;
+
     bool ini_success;
 
     #ifdef CANNY_VOTE
@@ -67,6 +72,7 @@ public:
     float max_weight_left;
     float max_weight_right;
     float confidence;
+    float conf_weight, conf_mse, conf_dist;
     // KalmanFilter kalman;
     float conf_c_x, conf_gamma_x, conf_c_y, conf_gamma_y;
     float conf_c_x_max, conf_c_x_min;
@@ -78,9 +84,15 @@ public:
     float getLineWeight(Vec4i line);
     float getConfidence(const vector<Point2f>& van_pt_candi, const vector<float>& van_pt_candi_w, 
         const vector<float>& valid_lines_w_left, const vector<float>& valid_lines_w_right); //, Point2f van_pt_obsv);
+    void updateFlags();
     void updateTrackVar();
     #endif
-	
+
+	float theta_w;	// yaw angle
+    float theta_h;	// pitch angle
+    float theta_w_unfil, theta_h_unfil;
+    const float ALPHA_W;
+    const float ALPHA_H;
 };
 
 void outputVideo(Mat image, Mat warped_img, VideoWriter& writer, const VanPt& van_pt, int& nframe);
