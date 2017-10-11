@@ -148,12 +148,12 @@ void VanPt::initialVan(Mat color_img, Mat image, Mat& warped_img)
 
 	#else
 	ini_success = edgeVote(image, edges);
-	updateFlags();
-	if (first_sucs)
-	{
-		van_pt_ini = van_pt_obsv;
-	}
-	updateTrackVar();
+	// updateFlags();
+	// if (first_sucs)
+	// {
+	// 	van_pt_ini = van_pt_obsv;
+	// }
+	// updateTrackVar();
 
 	#endif
 
@@ -189,7 +189,7 @@ void VanPt::initialVan(Mat color_img, Mat image, Mat& warped_img)
 	// #endif
 }
 
-bool VanPt::edgeVote(Mat image, Mat edges)
+bool VanPt::edgeVote(Mat image, Mat edges) // the original version as in 4
 {
 	/// vote for vanishing point based on Hough
 	vector<Vec4i> lines;
@@ -201,106 +201,148 @@ bool VanPt::edgeVote(Mat image, Mat edges)
 		cout << "Initilization failed: no Hough lines found. " << endl;
 		return false;
 	}
-	// find valid lines
-	int num_lines = lines.size();
-	vector<int> valid_lines_idx_left;
-	vector<float> valid_lines_w_left;
-	vector<int> valid_lines_idx_right;
-	vector<float> valid_lines_w_right;
+
+	Mat vote_left(image.rows, image.cols, CV_64FC1, Scalar(0));
+	Mat vote_right(image.rows, image.cols, CV_64FC1, Scalar(0));
+	Mat vote_line(image.rows, image.cols, CV_8UC1, Scalar(0));  // contain lines qualified to vote, decide bottom and sample color threshold 
+
+	float y_bottom_left = 0, y_bottom_right= 0; // warp source bottom
+
+	#ifndef HIGH_BOT
+	float y_bottom_max = min(image.rows * 14/15, image.rows -1 );
+	#else
+	float y_bottom_max = min(image.rows *7/10, image.rows -1 );  // for caltech data
+	#endif
+
+		
 	for (int i = 0; i < lines.size(); i++)
 	{
-		int check_result = checkValidLine(lines[i]);
-		if (check_result == 1)
+		float x1 = lines[i][0];
+		float y1 = lines[i][1];
+		float x2 = lines[i][2];
+		float y2 = lines[i][3];
+		double w = (abs(x1-x2) +abs(y1-y2));
+		float k = (x1-x2)/(y1-y2);
+		
+		if (abs(k) < 0.3 || abs(k) > 3 )
 		{
-			valid_lines_idx_left.push_back(i);
-			valid_lines_w_left.push_back(getLineWeight(lines[i]));
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
+			continue;
 		}
-		else if (check_result == 2)
+		float x0, y0; // find lower point
+		if (y1 > y2)
 		{
-			valid_lines_idx_right.push_back(i);
-			valid_lines_w_right.push_back(getLineWeight(lines[i]));
-		}
-		else if (check_result == 3)
-		{
-			line(vote_lines_img, Point(lines[i][0],lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0),1);
-		}
-		else if (check_result == 4)
-		{
-			line(vote_lines_img, Point(lines[i][0],lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255,255,0),1);
+			x0 = x1;
+			y0 = y1;
 		}
 		else
 		{
-			line(vote_lines_img, Point(lines[i][0],lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255,0,0),1);
+			x0 = x2;
+			y0 = y2;
+		}
+		if (k > 0) 	// right
+		{
+			if (x0 < image.cols / 2)
+			{
+				line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
+				continue;
+			}
+			for (int j = 0; j < y0 ; j++ )
+			{
+				int x_cur = x0 - k*j;
+				int y_cur = y0 - j;
+				if (x_cur > image.cols - 1 || x_cur < 0)
+					break;
+				vote_right.at<double>(y_cur, x_cur)+= w;
+			}
+			if (x0 + k*(y_bottom_max - y0)> image.cols - 1) // not approaching bottom
+			{
+				float lower_y = y0 + (image.cols - 1 - x0)/k;
+				if (lower_y > y_bottom_right)
+					y_bottom_right = lower_y;
+			}
+			else
+				y_bottom_right = y_bottom_max;
+			line(vote_line, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255), 1);
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 1);
+			lines_vote.push_back(lines[i]);
+		}
+		else // left
+		{
+			if (x0 > image.cols / 2)
+			{
+				line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
+				continue;
+			}
+			for (int j = 0; j < y0 ; j++ )
+			{
+				int x_cur = x0 - k*j;
+				int y_cur = y0 - j;
+				if (x_cur > image.cols - 1 || x_cur < 0)
+					break;
+				vote_left.at<double>(y_cur, x_cur)+= w;
+			}
+			if (x0 + k*(y_bottom_max - y0)< 0) // not approaching bottom
+			{
+				float lower_y = y0 + (0 - x0)/k;
+				if (lower_y > y_bottom_left)
+					y_bottom_left = lower_y;
+			}
+			else
+				y_bottom_left = y_bottom_max;
+			line(vote_line, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255), 1);
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 1);
+			lines_vote.push_back(lines[i]);
 		}
 	}
+	/// calculate proper warp region (lower vertex)
+		y_bottom_warp = y_bottom_max ;
+		if ((y_bottom_left != y_bottom_max || y_bottom_right != y_bottom_max ) && y_bottom_left != 0 && y_bottom_right != 0)
+		{
+			y_bottom_warp = min(y_bottom_left, y_bottom_right);
+		}
+	cout << "y_bottom_warp: " << y_bottom_warp << endl;
 
-	if (valid_lines_idx_left.size() <= 0 || valid_lines_idx_right.size() <= 0)
+
+	Mat votemap = vote_left.mul(vote_right)/(vote_left + vote_right);
+
+	double maxval;
+	Point van_pt_int;
+	minMaxLoc(votemap, NULL, &maxval, NULL, &van_pt_int);
+	if (maxval > 0)
 	{
-		cout << "Initilization failed: no valid lines found. " << endl;
+		van_pt_ini.x = van_pt_int.x;
+		van_pt_ini.y = van_pt_int.y;
+		ini_success = true;
+	}
+	else
+	{
+		ini_success = false;
 		return false;
 	}
 
-	// find van_pt_candi and synthesize to an estimate
-	vector<Point2f> van_pt_candi;
-	vector<float> van_pt_candi_w;
-	float weight_sum = 0, x_sum = 0, y_sum = 0;
-	for (int i = 0; i < valid_lines_idx_left.size(); i++)
-	{
-		for (int j = 0; j < valid_lines_idx_right.size(); j++)
-		{
-			float xl1 = lines[valid_lines_idx_left[i]][0];
-			float yl1 = lines[valid_lines_idx_left[i]][1];
-			float xl2 = lines[valid_lines_idx_left[i]][2];
-			float yl2 = lines[valid_lines_idx_left[i]][3];
-			float xr1 = lines[valid_lines_idx_right[j]][0];
-			float yr1 = lines[valid_lines_idx_right[j]][1];
-			float xr2 = lines[valid_lines_idx_right[j]][2];
-			float yr2 = lines[valid_lines_idx_right[j]][3];
-
-			float kl = (yl2 - yl1)/(xl2 - xl1);
-			float kr = (yr2 - yr1)/(xr2 - xr1);
-
-			float beta = 1/(kl - kr);
-			float xp = beta*(yr1 - yl1 + kl*xl1 - kr*xr1);
-			float yp = beta*(kl*kr*(xl1 - xr1) + kl*yr1 - kr*yl1);
-			van_pt_candi.push_back(Point2f(xp, yp));
-
-			float weight_cur = valid_lines_w_left[i] * valid_lines_w_right[j]; // or use sqrt? 
-			van_pt_candi_w.push_back(weight_cur);
-
-			weight_sum += weight_cur;
-			x_sum += weight_cur*xp;
-			y_sum += weight_cur*yp;
-
-			line(vote_lines_img, Point(xl1,yl1), Point(xl2, yl2), Scalar(0,0,255),1);
-			line(vote_lines_img, Point(xr1,yr1), Point(xr2, yr2), Scalar(0,0,255),1);
-			circle(vote_lines_img, Point(xp,yp), 2, Scalar(0,255,0), -1);
-			
-			
-		}
-	}
-	// Point2f van_pt_obsv;
-	van_pt_obsv.x = x_sum/weight_sum;
-	van_pt_obsv.y = y_sum/weight_sum;
-
-	// get confidence
-	confidence = getConfidence(van_pt_candi, van_pt_candi_w, valid_lines_w_left, valid_lines_w_right); //, van_pt_obsv);
-
-	// track with Kalman
-	van_pt_ini = confidence*van_pt_obsv + (1-confidence)*van_pt_ini;
-
 	theta_w = atan(tan(ALPHA_W)*((van_pt_ini.x - img_size.width/2)/(img_size.width/2))); 	// yaw angle 
 	theta_h = atan(tan(ALPHA_H)*((van_pt_ini.y - img_size.height/2)/(img_size.height/2)));	// pitch angle
-	theta_w_unfil = atan(tan(ALPHA_W)*((van_pt_obsv.x - img_size.width/2)/(img_size.width/2))); 	// yaw angle 
-	theta_h_unfil = atan(tan(ALPHA_H)*((van_pt_obsv.y - img_size.height/2)/(img_size.height/2)));	// pitch angle
-	int fontFace = FONT_HERSHEY_SIMPLEX;
-	double fontScale = 0.5;
-	int thickness = 1;
-	string Text1 = "pitch: " + x2str(theta_h*180/CV_PI) + ", yaw: " + x2str(theta_w*180/CV_PI);
-	putText(vote_lines_img, Text1, Point(10, 140), fontFace, fontScale, Scalar(0,0,255), thickness, LINE_AA);
-	
+
+	cout << "first van pt: " << van_pt_ini << "maxval: "<< maxval << endl;
+
+	#ifndef NDEBUG_IN
+	int thickness = ini_success ? -1:2;
+	Mat show_garbor;
+	normalize(vote_left+vote_right, show_garbor, 0, 255, NORM_MINMAX, CV_8U);
+	circle(show_garbor, Point(van_pt_ini), 5, Scalar( 255), thickness);
+	imshow("vote_left_right", show_garbor);
+	// imshow("vote_left", vote_left);
+	// imshow("vote_right", vote_right);
+	normalize(edges, show_garbor, 0, 255, NORM_MINMAX, CV_8U);
+	circle(show_garbor, Point(van_pt_ini), 5, Scalar( 255), thickness);
+	imshow("gabor_weight", show_garbor);
+	circle(vote_line, Point(van_pt_ini), 5, Scalar( 255), thickness);
+	imshow("vote_line", vote_line);
+	// waitKey(0);
+	#endif
+
 	return true;
-	
 }
 
 int VanPt::checkValidLine(Vec4i line)

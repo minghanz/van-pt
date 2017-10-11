@@ -56,8 +56,8 @@ int main(int argc, char** argv)
 	int msc[2], ispic, video_length;
 	import(argc, argv, file_name, image, reader, writer, msc, ispic, video_length);
 	cout << "Set time interval: [" << msc[0] <<", "<< msc[1] << "]" << endl;
-	ofstream outfile("pitch angle 80.txt");
-	ofstream outfile2("pitch angle 80 unfiltered.txt");
+	ofstream outfile("pitch angle 100 original canny_hough.txt");
+	// ofstream outfile2("pitch angle 80 unfiltered.txt");
 	
 	
 	/// initialize parameters that work cross frames 
@@ -100,14 +100,14 @@ int main(int argc, char** argv)
 				if (van_pt.ini_success)
 				{
 					outfile << van_pt.theta_h << endl;
-					outfile2 << van_pt.theta_h_unfil << endl;
+					// outfile2 << van_pt.theta_h_unfil << endl;
 				}
 		}
 		else
 		{
 			cout << "All frames processed. " << endl;
 			outfile.close();
-			outfile2.close();
+			// outfile2.close();
 			break;
 		}
 	}
