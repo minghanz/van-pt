@@ -56,7 +56,7 @@ int main(int argc, char** argv)
 	int msc[2], ispic, video_length;
 	import(argc, argv, file_name, image, reader, writer, msc, ispic, video_length);
 	cout << "Set time interval: [" << msc[0] <<", "<< msc[1] << "]" << endl;
-	ofstream outfile("pitch angle 100 original canny_hough.txt");
+	ofstream outfile("pitch angle 80 Gabor_cluster_fit.txt");
 	// ofstream outfile2("pitch angle 80 unfiltered.txt");
 	
 	

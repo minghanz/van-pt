@@ -189,6 +189,7 @@ void VanPt::initialVan(Mat color_img, Mat image, Mat& warped_img)
 	// #endif
 }
 
+#ifdef CANNY_VOTE
 bool VanPt::edgeVote(Mat image, Mat edges) // the original version as in 4
 {
 	/// vote for vanishing point based on Hough
@@ -568,6 +569,7 @@ void VanPt::updateTrackVar()
 		conf_c_y = max(conf_c_y_min, float(0.9*conf_c_y));
 	}
 }
+#endif
 
 void VanPt::getSteerKernel(Mat& kernel_x, Mat& kernel_y, Mat& kernel_xy, int ksize, double sigma)
 {
@@ -1129,7 +1131,7 @@ bool VanPt::GaborVote(Mat gabor_resp_dir, Mat gabor_weight, Mat& vote_map, Mat e
 		
 		if (abs(k) < 0.3 || abs(k) > 3 )
 		{
-			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 2);
 			continue;
 		}
 		float x0, y0; // find lower point
@@ -1147,7 +1149,7 @@ bool VanPt::GaborVote(Mat gabor_resp_dir, Mat gabor_weight, Mat& vote_map, Mat e
 		{
 			if (x0 < img_size.width / 2)
 			{
-				line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
+				line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 2);
 				continue;
 			}
 			for (int j = 0; j < y0 ; j++ )
@@ -1169,7 +1171,7 @@ bool VanPt::GaborVote(Mat gabor_resp_dir, Mat gabor_weight, Mat& vote_map, Mat e
 			else
 				y_bottom_right = y_bottom_warp_max;
 			line(vote_line, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255), 1);
-			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 1);
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 2);
 			
 			lines_vote.push_back(lines[i]);
 		}
@@ -1177,7 +1179,7 @@ bool VanPt::GaborVote(Mat gabor_resp_dir, Mat gabor_weight, Mat& vote_map, Mat e
 		{
 			if (x0 > img_size.width / 2)
 			{
-				line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
+				line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 2);
 				continue;
 			}
 			for (int j = 0; j < y0 ; j++ )
@@ -1199,7 +1201,7 @@ bool VanPt::GaborVote(Mat gabor_resp_dir, Mat gabor_weight, Mat& vote_map, Mat e
 			else
 				y_bottom_left = y_bottom_warp_max;
 			line(vote_line, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255), 1);
-			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 1);
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 2);
 
 			lines_vote.push_back(lines[i]);
 		}
@@ -1231,8 +1233,8 @@ bool VanPt::GaborVote(Mat gabor_resp_dir, Mat gabor_weight, Mat& vote_map, Mat e
 		return false;
 	}
 
-	int thickness = ini_success ? -1:2;
 	#ifndef NDEBUG_IN
+	int thickness = -1;
 	Mat show_garbor;
 	normalize(vote_left+vote_right, show_garbor, 0, 255, NORM_MINMAX, CV_8U);
 	circle(show_garbor, Point(van_pt_ini), 5, Scalar( 255), thickness);
@@ -1305,6 +1307,10 @@ bool VanPt::GaborVote(Mat gabor_resp_dir, Mat gabor_weight, Mat& vote_map, Mat e
 	// circle(show_garbor, van_pt_candi, 5, Scalar( 255), -1);
 	// imshow("gabor_weight", show_garbor);
 	// waitKey(0);
+
+	theta_w = atan(tan(ALPHA_W)*((van_pt_ini.x - img_size.width/2)/(img_size.width/2))); 	// yaw angle 
+	theta_h = atan(tan(ALPHA_H)*((van_pt_ini.y - img_size.height/2)/(img_size.height/2)));	// pitch angle
+
 
 	return true;
 }
@@ -1462,7 +1468,12 @@ void VanPt::NMS(Mat matrix, Mat& matrix_nms)
 void outputVideo(Mat image, Mat warped_img, VideoWriter& writer, const VanPt& van_pt, int& nframe)
 {
 	// add vanishing point related info to the image (draw the lines_vote)
-	addWeighted(image, 1, van_pt.vote_lines_img, 0.4, 0, image);
+	Mat vote_lines_img_gray, vote_lines_img_merge(img_size, CV_8UC3);
+	cvtColor(van_pt.vote_lines_img, vote_lines_img_gray, COLOR_BGR2GRAY);
+	int from_to[] = { 0,0, 0,1, 0,2};
+	mixChannels( &vote_lines_img_gray, 1, &vote_lines_img_merge, 1, from_to, 3 );
+	van_pt.vote_lines_img.copyTo(image, vote_lines_img_merge);
+	// addWeighted(image, 0.7, van_pt.vote_lines_img, 0.4, 0, image);
 
 	// add the warp image to the corner
 	Mat small_lane_window_out_img;
