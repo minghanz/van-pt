@@ -56,7 +56,9 @@ int main(int argc, char** argv)
 	int msc[2], ispic, video_length;
 	import(argc, argv, file_name, image, reader, writer, msc, ispic, video_length);
 	cout << "Set time interval: [" << msc[0] <<", "<< msc[1] << "]" << endl;
-	ofstream outfile("pitch angle 80 Gabor_cluster_fit.txt");
+	ofstream outfile("rosvideo pitch angle 100.txt");
+
+
 	// ofstream outfile2("pitch angle 80 unfiltered.txt");
 	
 	
@@ -99,7 +101,7 @@ int main(int argc, char** argv)
 				outputVideo(cali_image, warped_img, writer, van_pt, nframe);
 				if (van_pt.ini_success)
 				{
-					outfile << van_pt.theta_h << endl;
+					outfile << van_pt.theta_h << " " << nframe << endl;
 					// outfile2 << van_pt.theta_h_unfil << endl;
 				}
 		}

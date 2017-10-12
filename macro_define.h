@@ -29,7 +29,7 @@ extern Size img_size; // defined in main.cpp
 #define NDEBUG_TR // TRAIN
 #define NDEBUG
 //#define NTIME
-// #define HIGH_BOT
+#define HIGH_BOT
 
 #define DTREE
 //#define LREGG
@@ -38,7 +38,7 @@ extern Size img_size; // defined in main.cpp
 
 //#define COUT
 
-// #define CALI_VAN // whether prior calibrated vanishing point is available
+#define CALI_VAN // whether prior calibrated vanishing point is available
 
-#define CLUSTER_FOR_VOTE //  NMS+Hough  or  cluster+fit  in GaborVote
-// #define CANNY_VOTE
+// #define CLUSTER_FOR_VOTE //  NMS+Hough  or  cluster+fit  in GaborVote
+#define CANNY_VOTE

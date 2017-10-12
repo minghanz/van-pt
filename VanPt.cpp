@@ -120,12 +120,9 @@ void VanPt::initialVan(Mat color_img, Mat image, Mat& warped_img)
 	bitwise_and(edges, cali_mask, edges); // remove the edges caused by warp effect
 
 	int dist_top_thre = (y_bottom_warp_max - van_pt_cali.y)*1/6; 			// may need modification: depends on cali or detect result ?
-	#ifndef HIGH_BOT
+
 	edges.rowRange(0, van_pt_cali.y + dist_top_thre) = 0;
-	#else
-	edges.rowRange(0, van_pt_cali.y + dist_top_thre) = 0;
-	edges.rowRange(image.rows*7/10, image.rows) = 0;  // for caltech data
-	#endif
+	edges.rowRange(y_bottom_warp_max, image.rows) = 0;  // for caltech data
 
 	#ifndef CANNY_VOTE
 	// Mat steer_resp_mag(image.size(), CV_32FC1, Scalar(0));
@@ -1131,7 +1128,7 @@ bool VanPt::GaborVote(Mat gabor_resp_dir, Mat gabor_weight, Mat& vote_map, Mat e
 		
 		if (abs(k) < 0.3 || abs(k) > 3 )
 		{
-			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 2);
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
 			continue;
 		}
 		float x0, y0; // find lower point
@@ -1149,7 +1146,7 @@ bool VanPt::GaborVote(Mat gabor_resp_dir, Mat gabor_weight, Mat& vote_map, Mat e
 		{
 			if (x0 < img_size.width / 2)
 			{
-				line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 2);
+				line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
 				continue;
 			}
 			for (int j = 0; j < y0 ; j++ )
@@ -1171,7 +1168,7 @@ bool VanPt::GaborVote(Mat gabor_resp_dir, Mat gabor_weight, Mat& vote_map, Mat e
 			else
 				y_bottom_right = y_bottom_warp_max;
 			line(vote_line, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255), 1);
-			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 2);
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 1);
 			
 			lines_vote.push_back(lines[i]);
 		}
@@ -1179,7 +1176,7 @@ bool VanPt::GaborVote(Mat gabor_resp_dir, Mat gabor_weight, Mat& vote_map, Mat e
 		{
 			if (x0 > img_size.width / 2)
 			{
-				line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 2);
+				line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
 				continue;
 			}
 			for (int j = 0; j < y0 ; j++ )
@@ -1201,7 +1198,7 @@ bool VanPt::GaborVote(Mat gabor_resp_dir, Mat gabor_weight, Mat& vote_map, Mat e
 			else
 				y_bottom_left = y_bottom_warp_max;
 			line(vote_line, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255), 1);
-			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 2);
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 1);
 
 			lines_vote.push_back(lines[i]);
 		}

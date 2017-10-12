@@ -15,8 +15,8 @@ void cameraCalibration(vector<vector<Point3f> >& obj_pts, vector<vector<Point2f>
 	vector<Point3f> objp;
 	vector<Point2f> imgp;
 	
-	// string first_file = "../usb_cali_images/cali%d.jpg"; //"../camera_cal/calibration%d.jpg";
-	string first_file = "../camera_cal/calibration%d.jpg";
+	string first_file = "../usb_cali_images/cali%d.jpg"; //"../camera_cal/calibration%d.jpg";
+	// string first_file = "../camera_cal/calibration%d.jpg";
 	VideoCapture calib_imgseq(first_file);
 	if (!calib_imgseq.isOpened())
 	{
@@ -275,7 +275,7 @@ void illuComp(Mat& raw_img, Mat& gray, float& illu_comp)
 		cout << "total_pix: " << total_pix << ", accu_num_pix: " << accu_num_pix << endl;
 		cout << accu_graylevel << " " << effective_num_pix << endl;
 		cout << "avg_gray: " << avg_gray<< endl;
-		illu_comp = 80 / avg_gray; // 100 80
+		illu_comp = 100 / avg_gray; // 100 80
 	}
 	
 	#ifndef NDEBUG_IN
