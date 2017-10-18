@@ -1,4 +1,4 @@
-void VanPt::edgeVote(Mat image, Mat edges) // the original version as in 4
+bool VanPt::edgeVote(Mat image, Mat edges) // the original version as in 4
 {
 	/// vote for vanishing point based on Hough
 	vector<Vec4i> lines;
@@ -8,7 +8,7 @@ void VanPt::edgeVote(Mat image, Mat edges) // the original version as in 4
 	if (lines.size() <= 0) /// safe return
 	{
 		cout << "Initilization failed: no Hough lines found. " << endl;
-		return ;
+		return false;
 	}
 
 	Mat vote_left(image.rows, image.cols, CV_64FC1, Scalar(0));
@@ -34,7 +34,10 @@ void VanPt::edgeVote(Mat image, Mat edges) // the original version as in 4
 		float k = (x1-x2)/(y1-y2);
 		
 		if (abs(k) < 0.3 || abs(k) > 3 )
+		{
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
 			continue;
+		}
 		float x0, y0; // find lower point
 		if (y1 > y2)
 		{
@@ -49,7 +52,10 @@ void VanPt::edgeVote(Mat image, Mat edges) // the original version as in 4
 		if (k > 0) 	// right
 		{
 			if (x0 < image.cols / 2)
+			{
+				line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
 				continue;
+			}
 			for (int j = 0; j < y0 ; j++ )
 			{
 				int x_cur = x0 - k*j;
@@ -67,12 +73,16 @@ void VanPt::edgeVote(Mat image, Mat edges) // the original version as in 4
 			else
 				y_bottom_right = y_bottom_max;
 			line(vote_line, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255), 1);
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 1);
 			lines_vote.push_back(lines[i]);
 		}
 		else // left
 		{
 			if (x0 > image.cols / 2)
+			{
+				line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
 				continue;
+			}
 			for (int j = 0; j < y0 ; j++ )
 			{
 				int x_cur = x0 - k*j;
@@ -90,6 +100,7 @@ void VanPt::edgeVote(Mat image, Mat edges) // the original version as in 4
 			else
 				y_bottom_left = y_bottom_max;
 			line(vote_line, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255), 1);
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 1);
 			lines_vote.push_back(lines[i]);
 		}
 	}
@@ -109,16 +120,23 @@ void VanPt::edgeVote(Mat image, Mat edges) // the original version as in 4
 	minMaxLoc(votemap, NULL, &maxval, NULL, &van_pt_int);
 	if (maxval > 0)
 	{
-		van_pt_ini.x = (int)van_pt_int.x;
-		van_pt_ini.y = (int)van_pt_int.y;
+		van_pt_ini.x = van_pt_int.x;
+		van_pt_ini.y = van_pt_int.y;
 		ini_success = true;
 	}
-	else{ini_success = false;}
+	else
+	{
+		ini_success = false;
+		return false;
+	}
+
+	theta_w = atan(tan(ALPHA_W)*((van_pt_ini.x - img_size.width/2)/(img_size.width/2))); 	// yaw angle 
+	theta_h = atan(tan(ALPHA_H)*((van_pt_ini.y - img_size.height/2)/(img_size.height/2)));	// pitch angle
 
 	cout << "first van pt: " << van_pt_ini << "maxval: "<< maxval << endl;
-	int thickness = ini_success ? -1:2;
 
 	#ifndef NDEBUG_IN
+	int thickness = ini_success ? -1:2;
 	Mat show_garbor;
 	normalize(vote_left+vote_right, show_garbor, 0, 255, NORM_MINMAX, CV_8U);
 	circle(show_garbor, Point(van_pt_ini), 5, Scalar( 255), thickness);
@@ -132,4 +150,6 @@ void VanPt::edgeVote(Mat image, Mat edges) // the original version as in 4
 	imshow("vote_line", vote_line);
 	// waitKey(0);
 	#endif
+
+	return true;
 }

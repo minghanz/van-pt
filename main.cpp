@@ -56,14 +56,14 @@ int main(int argc, char** argv)
 	int msc[2], ispic, video_length;
 	import(argc, argv, file_name, image, reader, writer, msc, ispic, video_length);
 	cout << "Set time interval: [" << msc[0] <<", "<< msc[1] << "]" << endl;
-	ofstream outfile("rosvideo pitch angle 100.txt");
-
-
-	// ofstream outfile2("pitch angle 80 unfiltered.txt");
+	// ofstream outfile("pitch angle 100.txt");
+	// ofstream outfile2("pitch angle 100_unfiltered.txt");
 	
 	
 	/// initialize parameters that work cross frames 
 	clock_t t_start = clock();
+	clock_t t_0 = t_start;
+	clock_t t_1 = t_start;
 	float time_step = 0; 		// counting frames, fed to LaneImage(__nframe)
 	img_size = Size(reader.get(CV_CAP_PROP_FRAME_WIDTH), reader.get(CV_CAP_PROP_FRAME_HEIGHT));
 
@@ -76,7 +76,6 @@ int main(int argc, char** argv)
 		reader.read(image);
 		if(!image.empty() && (msc[1] == -1 || reader.get(CV_CAP_PROP_POS_MSEC) <= msc[1]))
 		{
-			
 			cout << "current time(msc): " << reader.get(CV_CAP_PROP_POS_MSEC) << endl;
 			
 
@@ -98,17 +97,24 @@ int main(int argc, char** argv)
 				illuComp(cali_image, gray, illu_comp);
 				van_pt.initialVan(cali_image, gray, warped_img);
 
+				#ifdef DRAW
 				outputVideo(cali_image, warped_img, writer, van_pt, nframe);
-				if (van_pt.ini_success)
-				{
-					outfile << van_pt.theta_h << " " << nframe << endl;
-					// outfile2 << van_pt.theta_h_unfil << endl;
-				}
+				#else
+				nframe ++;
+				#endif
+				// if (van_pt.ini_success)
+				// {
+				// 	outfile << van_pt.theta_h << " " << nframe << endl;
+				// 	outfile2 << van_pt.theta_h_unfil << " " << nframe << endl;
+				// }
+				t_1 = clock();
+				cout << "Frame " << x2str(nframe) << ", using: " << x2str((float)(t_1 - t_0)) / CLOCKS_PER_SEC) << "s. " << endl;
+				t_0 = t_1;
 		}
 		else
 		{
-			cout << "All frames processed. " << endl;
-			outfile.close();
+			cout << "All " << x2str(nframe) << " frames processed, using " << x2str((float)(t_1 - t_start)) / CLOCKS_PER_SEC) << "s. " << endl;
+			// outfile.close();
 			// outfile2.close();
 			break;
 		}

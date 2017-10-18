@@ -38,6 +38,8 @@ extern Size img_size; // defined in main.cpp
 
 //#define COUT
 
+#define DRAW
+
 #define CALI_VAN // whether prior calibrated vanishing point is available
 
 // #define CLUSTER_FOR_VOTE //  NMS+Hough  or  cluster+fit  in GaborVote

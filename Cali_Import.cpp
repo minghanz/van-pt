@@ -254,16 +254,16 @@ void illuComp(Mat& raw_img, Mat& gray, float& illu_comp)
 				limit_low = i;
 				start = true;
 				effective_num_pix = accu_num_pix;
-				cout << "effective_num_pix 1: " << effective_num_pix << endl;
+				// cout << "effective_num_pix 1: " << effective_num_pix << endl;
 			}
 			if ( accu_num_pix >= 0.8*total_pix && ending == false )
 			{
 				limit_high = i;
 				ending = true;
-				cout << "effective_num_pix 2: " << effective_num_pix << endl;
+				// cout << "effective_num_pix 2: " << effective_num_pix << endl;
 				effective_num_pix = accu_num_pix - effective_num_pix;
-				cout << "accu_num_pix: " << accu_num_pix << endl;
-				cout << "effective_num_pix 3: " << effective_num_pix << endl;
+				// cout << "accu_num_pix: " << accu_num_pix << endl;
+				// cout << "effective_num_pix 3: " << effective_num_pix << endl;
 				break;
 			}
 			accu_num_pix += pixhis_gray.at<float>(i);
@@ -272,9 +272,9 @@ void illuComp(Mat& raw_img, Mat& gray, float& illu_comp)
 		}
 		float avg_gray = accu_graylevel / effective_num_pix;
 		//cout << pixhis_gray << endl;
-		cout << "total_pix: " << total_pix << ", accu_num_pix: " << accu_num_pix << endl;
-		cout << accu_graylevel << " " << effective_num_pix << endl;
-		cout << "avg_gray: " << avg_gray<< endl;
+		// cout << "total_pix: " << total_pix << ", accu_num_pix: " << accu_num_pix << endl;
+		// cout << accu_graylevel << " " << effective_num_pix << endl;
+		// cout << "avg_gray: " << avg_gray<< endl;
 		illu_comp = 100 / avg_gray; // 100 80
 	}
 	
@@ -284,7 +284,7 @@ void illuComp(Mat& raw_img, Mat& gray, float& illu_comp)
 	gray = gray*illu_comp;
 	raw_img = raw_img*illu_comp;
 	#ifndef NDEBUG_IN
-	// imshow("image after compen", raw_img);
+	imshow("image after compen", raw_img);
 	// waitKey(0);
 	#endif
 	return;

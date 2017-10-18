@@ -120,9 +120,12 @@ void VanPt::initialVan(Mat color_img, Mat image, Mat& warped_img)
 	bitwise_and(edges, cali_mask, edges); // remove the edges caused by warp effect
 
 	int dist_top_thre = (y_bottom_warp_max - van_pt_cali.y)*1/6; 			// may need modification: depends on cali or detect result ?
-
+	#ifndef HIGH_BOT
 	edges.rowRange(0, van_pt_cali.y + dist_top_thre) = 0;
-	edges.rowRange(y_bottom_warp_max, image.rows) = 0;  // for caltech data
+	#else
+	edges.rowRange(0, van_pt_cali.y + dist_top_thre) = 0;
+	edges.rowRange(image.rows*7/10, image.rows) = 0;  // for caltech data
+	#endif
 
 	#ifndef CANNY_VOTE
 	// Mat steer_resp_mag(image.size(), CV_32FC1, Scalar(0));
@@ -134,8 +137,8 @@ void VanPt::initialVan(Mat color_img, Mat image, Mat& warped_img)
     Mat gabor_resp_mag(image.size(), CV_32FC1, Scalar(0));
     Mat gabor_weight(image.size(), CV_32FC1, Scalar(0));
     Mat gabor_vote(image.size(), CV_32FC1, Scalar(0));
-	GaborFilter(image, gabor_resp_mag, gabor_resp_dir, gabor_weight);
-	
+    GaborFilter(image, gabor_resp_mag, gabor_resp_dir, gabor_weight);
+    cout << "Ok 3" << endl;
     ini_success = GaborVote(gabor_resp_dir, gabor_weight, gabor_vote, edges);
     // GaborVote(steer_angle_max, steer_resp_weight, gabor_vote);
     
@@ -179,16 +182,13 @@ void VanPt::initialVan(Mat color_img, Mat image, Mat& warped_img)
 	per_mtx = getPerspectiveTransform(warp_src, warp_dst);
 	inv_per_mtx = getPerspectiveTransform(warp_dst, warp_src);
 
-	#ifdef DRAW
 	// Mat warped_img;
 	warpPerspective(color_img, warped_img, per_mtx, Size(warp_col, warp_row), INTER_NEAREST);
 	// #ifndef NDEBUG_IN
 	// imshow("warped image", warped_img);
 	// #endif
-	#endif
 }
 
-#ifdef CANNY_VOTE
 bool VanPt::edgeVote(Mat image, Mat edges)
 {
 	/// vote for vanishing point based on Hough
@@ -220,7 +220,6 @@ bool VanPt::edgeVote(Mat image, Mat edges)
 			valid_lines_idx_right.push_back(i);
 			valid_lines_w_right.push_back(getLineWeight(lines[i]));
 		}
-		#ifdef DRAW
 		else if (check_result == 3)
 		{
 			line(vote_lines_img, Point(lines[i][0],lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0),1);
@@ -233,7 +232,6 @@ bool VanPt::edgeVote(Mat image, Mat edges)
 		{
 			line(vote_lines_img, Point(lines[i][0],lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255,0,0),1);
 		}
-		#endif
 	}
 
 	if (valid_lines_idx_left.size() <= 0 || valid_lines_idx_right.size() <= 0)
@@ -274,11 +272,10 @@ bool VanPt::edgeVote(Mat image, Mat edges)
 			x_sum += weight_cur*xp;
 			y_sum += weight_cur*yp;
 
-			#ifdef DRAW
 			line(vote_lines_img, Point(xl1,yl1), Point(xl2, yl2), Scalar(0,0,255),1);
 			line(vote_lines_img, Point(xr1,yr1), Point(xr2, yr2), Scalar(0,0,255),1);
 			circle(vote_lines_img, Point(xp,yp), 2, Scalar(0,255,0), -1);
-			#endif
+			
 			
 		}
 	}
@@ -296,12 +293,11 @@ bool VanPt::edgeVote(Mat image, Mat edges)
 	theta_h = atan(tan(ALPHA_H)*((van_pt_ini.y - img_size.height/2)/(img_size.height/2)));	// pitch angle
 	theta_w_unfil = atan(tan(ALPHA_W)*((van_pt_obsv.x - img_size.width/2)/(img_size.width/2))); 	// yaw angle 
 	theta_h_unfil = atan(tan(ALPHA_H)*((van_pt_obsv.y - img_size.height/2)/(img_size.height/2)));	// pitch angle
-
-	// int fontFace = FONT_HERSHEY_SIMPLEX;
-	// double fontScale = 0.5;
-	// int thickness = 1;
-	// string Text1 = "pitch: " + x2str(theta_h*180/CV_PI) + ", yaw: " + x2str(theta_w*180/CV_PI);
-	// putText(vote_lines_img, Text1, Point(10, 140), fontFace, fontScale, Scalar(0,0,255), thickness, LINE_AA);
+	int fontFace = FONT_HERSHEY_SIMPLEX;
+	double fontScale = 0.5;
+	int thickness = 1;
+	string Text1 = "pitch: " + x2str(theta_h*180/CV_PI) + ", yaw: " + x2str(theta_w*180/CV_PI);
+	putText(vote_lines_img, Text1, Point(10, 140), fontFace, fontScale, Scalar(0,0,255), thickness, LINE_AA);
 	
 	return true;
 	
@@ -386,10 +382,8 @@ float VanPt::getLineWeight(Vec4i line)
 	float gamma_dist = 1.0/40.0, c_dist = 70;
 	float dist_weight = 0.5*(1-tanh(gamma_dist*(dist2ref - c_dist)));
 
-	#ifdef DRAW
-	// circle(vote_lines_img, Point(ref_pt), (int)c_dist, Scalar(255,0,0));
-	// circle(vote_lines_img, Point(ref_pt), (int)c_dist + (int)(1/gamma_dist), Scalar(255,0,0));
-	#endif
+	circle(vote_lines_img, Point(ref_pt), (int)c_dist, Scalar(255,0,0));
+	circle(vote_lines_img, Point(ref_pt), (int)c_dist + (int)(1/gamma_dist), Scalar(255,0,0));
 
 	float weight = length/(y_bottom_warp_max-ref_pt.y)*max((float)0,y_bottom - ref_pt.y)/(y_bottom_warp_max - ref_pt.y)*dist_weight;
 
@@ -422,19 +416,19 @@ float VanPt::getConfidence(const vector<Point2f>& van_pt_candi, const vector<flo
 	}
 	else if (weight_left > max_weight_left)
 	{
-		conf_weight = sqrt(weight_right / max_weight_right); //pow(weight_right / max_weight_right, 0.7);
+		conf_weight = pow(weight_right / max_weight_right, 0.7);
 		max_weight_left = weight_left;
 		max_weight_right *= 0.99;
 	}
 	else if (weight_right > max_weight_right)
 	{
-		conf_weight = sqrt(weight_left / max_weight_left); //pow(weight_left / max_weight_left, 0.7);
+		conf_weight = pow(weight_left / max_weight_left, 0.7);
 		max_weight_right = weight_right;
 		max_weight_left *= 0.99;
 	}
 	else 
 	{
-		conf_weight = sqrt(min(weight_left / max_weight_left, weight_right / max_weight_right)); //pow(min(weight_left / max_weight_left, weight_right / max_weight_right), 0.7 );
+		conf_weight = pow(min(weight_left / max_weight_left, weight_right / max_weight_right), 0.7 );
 		max_weight_left *= 0.99;
 		max_weight_right *= 0.99;
 	}
@@ -470,24 +464,23 @@ float VanPt::getConfidence(const vector<Point2f>& van_pt_candi, const vector<flo
 		filter_confidence = (cur_confidence + confidence)/2;
 	}
 
-	#ifdef DRAW
+
 	circle(vote_lines_img, Point(van_pt_obsv), (int)van_pt_mse, Scalar(0,0,255));
 	circle(vote_lines_img, Point(van_pt_obsv), 5, Scalar(0,0,255), -1);
 	
 	rectangle(vote_lines_img, Point(ref_pt.x - c_x, ref_pt.y - c_y), Point(ref_pt.x + c_x, ref_pt.y + c_y), Scalar(255,0,0));
-	#endif
-
-	// int fontFace = FONT_HERSHEY_SIMPLEX;
-	// double fontScale = 0.5;
-	// int thickness = 1;
-	// string Text1 = "conf_w: " + x2str(conf_weight) + ", conf_mse: " + x2str(conf_mse) + ", conf_dist: " + x2str(conf_dist);
-	// string Text2 = "conf_cur: " + x2str(cur_confidence) + ", conf: " + x2str(filter_confidence);
-	// string Text3 = "w: (" + x2str(weight_left) + ", " + x2str(weight_right) + "), w_max: (" + x2str(max_weight_left) + ", " + x2str(max_weight_right) + ")";
-	// string Text4 = "van_pt_obsv: (" + x2str((int)van_pt_obsv.x) + ", " + x2str((int)van_pt_obsv.y) + ")";
-	// putText(vote_lines_img, Text1, Point(10, 80), fontFace, fontScale, Scalar(0,0,255), thickness, LINE_AA);
-	// putText(vote_lines_img, Text2, Point(10, 100), fontFace, fontScale, Scalar(0,0,255), thickness, LINE_AA);
-	// putText(vote_lines_img, Text3, Point(10, 120), fontFace, fontScale, Scalar(0,0,255), thickness, LINE_AA);
-	// putText(vote_lines_img, Text4, Point(270, 60), fontFace, fontScale, Scalar(0,0,255), thickness, LINE_AA);
+	
+	int fontFace = FONT_HERSHEY_SIMPLEX;
+	double fontScale = 0.5;
+	int thickness = 1;
+	string Text1 = "conf_w: " + x2str(conf_weight) + ", conf_mse: " + x2str(conf_mse) + ", conf_dist: " + x2str(conf_dist);
+	string Text2 = "conf_cur: " + x2str(cur_confidence) + ", conf: " + x2str(filter_confidence);
+	string Text3 = "w: (" + x2str(weight_left) + ", " + x2str(weight_right) + "), w_max: (" + x2str(max_weight_left) + ", " + x2str(max_weight_right) + ")";
+	string Text4 = "van_pt_obsv: (" + x2str((int)van_pt_obsv.x) + ", " + x2str((int)van_pt_obsv.y) + ")";
+	putText(vote_lines_img, Text1, Point(10, 80), fontFace, fontScale, Scalar(0,0,255), thickness, LINE_AA);
+	putText(vote_lines_img, Text2, Point(10, 100), fontFace, fontScale, Scalar(0,0,255), thickness, LINE_AA);
+	putText(vote_lines_img, Text3, Point(10, 120), fontFace, fontScale, Scalar(0,0,255), thickness, LINE_AA);
+	putText(vote_lines_img, Text4, Point(270, 60), fontFace, fontScale, Scalar(0,0,255), thickness, LINE_AA);
 	
 	
 	return filter_confidence;
@@ -533,7 +526,6 @@ void VanPt::updateTrackVar()
 		conf_c_y = max(conf_c_y_min, float(0.9*conf_c_y));
 	}
 }
-#endif
 
 void VanPt::getSteerKernel(Mat& kernel_x, Mat& kernel_y, Mat& kernel_xy, int ksize, double sigma)
 {
@@ -570,9 +562,9 @@ void VanPt::SteerFilter(Mat image, Mat& steer_resp_mag, Mat& steer_angle_max, Ma
 	Mat kernel_steer_x(ksize, ksize, CV_32F);
 	Mat kernel_steer_y(ksize, ksize, CV_32F);
 	Mat kernel_steer_xy(ksize, ksize, CV_32F);
-	
+	cout <<"lalala 0 " << endl;
 	getSteerKernel(kernel_steer_x, kernel_steer_y, kernel_steer_xy, ksize, sigma);
-	
+	cout <<"lalala 1 " << endl;
 	Mat steer_resp_x, steer_resp_y, steer_resp_xy;
 	filter2D(image, steer_resp_x, CV_32F, kernel_steer_x );
 	filter2D(image, steer_resp_y, CV_32F, kernel_steer_y );
@@ -755,7 +747,7 @@ void VanPt::GaborFilter(Mat image, Mat& gabor_resp_mag, Mat& gabor_resp_dir, Mat
     int ksize = ((int)(sigma*9))/2*2+1;
     double psi=CV_PI*0;
 	int ktype=CV_32F;
-	
+	cout << "Ok 1" << endl;
     for (int i = 0; i < 4; i++)
     {
         double theta = i*CV_PI/4;
@@ -767,11 +759,11 @@ void VanPt::GaborFilter(Mat image, Mat& gabor_resp_mag, Mat& gabor_resp_dir, Mat
 		string image_name = ss.str();
 
 		#ifndef NDEBUG_IN
-		Mat show_garbor;
-		normalize(gaborKernelReal[i], show_garbor, 0, 255, NORM_MINMAX, CV_8U);
-		imshow(image_name, show_garbor);
-		normalize(gaborKernelImage[i], show_garbor, 0, 255, NORM_MINMAX, CV_8U);
-		imshow(image_name+" im", show_garbor);
+		// Mat show_garbor;
+		// normalize(gaborKernelReal[i], show_garbor, 0, 255, NORM_MINMAX, CV_8U);
+		// imshow(image_name, show_garbor);
+		// normalize(gaborKernelImage[i], show_garbor, 0, 255, NORM_MINMAX, CV_8U);
+		// imshow(image_name+" im", show_garbor);
 		#endif
 
 		filter2D(image, gabor_resp_real[i], CV_32F, gaborKernelReal[i]);
@@ -851,7 +843,7 @@ void VanPt::GaborFilter(Mat image, Mat& gabor_resp_mag, Mat& gabor_resp_dir, Mat
 	// waitKey(0);
 
 
-	
+	cout << "Ok 4" << endl;
 	#ifndef NDEBUG_IN
 	Mat show_garbor;
 	normalize(gabor_weight, show_garbor, 0, 255, NORM_MINMAX, CV_8U);
@@ -873,398 +865,395 @@ bool VanPt::GaborVote(Mat gabor_resp_dir, Mat gabor_weight, Mat& vote_map, Mat e
 
 	Mat gabor_weight_8U_nms(gabor_resp_dir.size(), CV_8UC1, Scalar(0));
 
-	//////////////////////**********************************************////////////////////// (un)comment below
-	// #ifndef CLUSTER_FOR_VOTE     // using NMS+Hough
-	// // narrowlize the Gabor weight using Non-maximum-suppressing before fed to Hough
-	// Size ksize(9,9);
-	// double sigmaX = 3;
-	// double sigmaY = 3;
-	// GaussianBlur(gabor_weight_8U, gabor_weight_8U, ksize, sigmaX, sigmaY );
-	// // NMS(gabor_weight_8U, gabor_weight_8U_nms);					// narrow using NMS
-	// // Mat dilate_kern = getStructuringElement(MORPH_RECT, Size(3,2));
-	// // dilate(gabor_weight_8U_nms, gabor_weight_8U_nms, dilate_kern);
-	// threshold(gabor_weight_8U, gabor_weight_8U, 0, 255, THRESH_BINARY);	  // narrow using canny edges of original image
-	// gabor_weight_8U_nms = edges & gabor_weight_8U;
-	// imshow("edges", edges);
+	#ifndef CLUSTER_FOR_VOTE     // using NMS+Hough
+	// narrowlize the Gabor weight using Non-maximum-suppressing before fed to Hough
+	Size ksize(9,9);
+	double sigmaX = 3;
+	double sigmaY = 3;
+	GaussianBlur(gabor_weight_8U, gabor_weight_8U, ksize, sigmaX, sigmaY );
+	// NMS(gabor_weight_8U, gabor_weight_8U_nms);					// narrow using NMS
+	// Mat dilate_kern = getStructuringElement(MORPH_RECT, Size(3,2));
+	// dilate(gabor_weight_8U_nms, gabor_weight_8U_nms, dilate_kern);
+	threshold(gabor_weight_8U, gabor_weight_8U, 0, 255, THRESH_BINARY);	  // narrow using canny edges of original image
+	gabor_weight_8U_nms = edges & gabor_weight_8U;
+	imshow("edges", edges);
 
-	// #ifndef NDEBUG_IN 
-	// // imshow("gabor_weight_8U", gabor_weight_8U);
-	// // imshow("gabor_weight_8U_nms", gabor_weight_8U_nms);
+	#ifndef NDEBUG_IN 
+	// imshow("gabor_weight_8U", gabor_weight_8U);
+	// imshow("gabor_weight_8U_nms", gabor_weight_8U_nms);
+	#endif
+
+	// // Use canny of Gabor weight to narrow 
+	// Mat gabor_weight_8U_nms(gabor_resp_dir.size(), CV_8UC1, Scalar(0));
+	// Canny(gabor_weight_8U, gabor_weight_8U_nms, 100, 30, 3 );
+	// #ifndef NDEBUG_IN
+	// imshow("gabor_weight_CV_8U_nms", gabor_weight_8U_nms);
 	// #endif
 
-	// // // Use canny of Gabor weight to narrow 
-	// // Mat gabor_weight_8U_nms(gabor_resp_dir.size(), CV_8UC1, Scalar(0));
-	// // Canny(gabor_weight_8U, gabor_weight_8U_nms, 100, 30, 3 );
-	// // #ifndef NDEBUG_IN
-	// // imshow("gabor_weight_CV_8U_nms", gabor_weight_8U_nms);
-	// // #endif
+
+	// feed to hough
+	vector<Vec4i> lines;
+	vector<Vec4i> lines_right;
+	double rho = 1;
+	double theta = 1*CV_PI/180;
+	int threshol = 10; //20
+	double minLineLength = 10; //20
+	double maxLineGap = 10;
+	HoughLinesP(gabor_weight_8U_nms, lines, rho, theta, threshol, minLineLength, maxLineGap );
+	// HoughLines(gabor_weight_8U_nms, lines, rho, theta, threshol, 0, 0, CV_PI/12, CV_PI*11/12 );
 
 
-	// // feed to hough
-	// vector<Vec4i> lines;
-	// vector<Vec4i> lines_right;
-	// double rho = 1;
-	// double theta = 1*CV_PI/180;
-	// int threshol = 10; //20
-	// double minLineLength = 10; //20
-	// double maxLineGap = 10;
-	// HoughLinesP(gabor_weight_8U_nms, lines, rho, theta, threshol, minLineLength, maxLineGap );
-	// // HoughLines(gabor_weight_8U_nms, lines, rho, theta, threshol, 0, 0, CV_PI/12, CV_PI*11/12 );
+	Mat vote_line_ori(gabor_resp_dir.size(), CV_8UC1, Scalar(0));
+	int num_left_line = 0, num_right_line = 0;
+	for (int i = 0; i < lines.size(); i++)
+	{
+		line(vote_line_ori, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255) );
+		float k = ((float)(lines[i][0] - lines[i][2]))/(lines[i][1] - lines[i][3]);
+		if (k > 0.3 && k < 3 && (lines[i][0] >= img_size.width / 2 || lines[i][2] >= img_size.width / 2)) // right
+		{
+			num_right_line++;
+		}
+		else if (k > -3 && k < -0.3 && (lines[i][0] <= img_size.width / 2 || lines[i][2] <= img_size.width / 2))  // left
+		{
+			num_left_line++;
+		}
+	}
+	// #ifndef NDEBUG_IN
+	// imshow("vote_line_ori",vote_line_ori);
+	// #endif
 
+	// supplementary hough if one side has not line
+	if (num_left_line == 0)
+	{
+		Mat gabor_weight_8U_nms_left(gabor_resp_dir.size(), CV_8UC1, Scalar(0));
+		gabor_weight_8U_nms_left.colRange(0, img_size.width/2) = gabor_weight_8U_nms.colRange(0, img_size.width/2) + 0;
+		vector<Vec4i> lines_left;
+		HoughLinesP(gabor_weight_8U_nms_left, lines_left, rho, theta, threshol, minLineLength, maxLineGap );
+		lines.insert(lines.end(), lines_left.begin(), lines_left.end() );
+		cout << "left lines extracted seperately. " << endl;
+	}
+	if (num_right_line == 0)
+	{
+		Mat gabor_weight_8U_nms_right(gabor_resp_dir.size(), CV_8UC1, Scalar(0));
+		gabor_weight_8U_nms_right.colRange(img_size.width/2, img_size.width) = gabor_weight_8U_nms.colRange(img_size.width/2, img_size.width) + 0;
+		vector<Vec4i> lines_right;
+		HoughLinesP(gabor_weight_8U_nms_right, lines_right, rho, theta, threshol, minLineLength, maxLineGap );
+		lines.insert(lines.end(), lines_right.begin(), lines_right.end() );
+		cout << "right lines extracted seperately. " << endl;
+	}
 
-	// Mat vote_line_ori(gabor_resp_dir.size(), CV_8UC1, Scalar(0));
-	// int num_left_line = 0, num_right_line = 0;
-	// for (int i = 0; i < lines.size(); i++)
+	#else     // using cluster+fit
+
+	Mat gabor_weight_cluster_label, gabor_weight_stats, gabor_weight_center;
+	int num_cluster = connectedComponentsWithStats(gabor_weight_8U, gabor_weight_cluster_label, gabor_weight_stats, gabor_weight_center);
+	vector<Vec4i> lines;
+	cout << "finish clustering" << endl;
+	// for (int i = 1; i < num_cluster; i++) 		// finding best point-pair
 	// {
-	// 	line(vote_line_ori, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255) );
-	// 	float k = ((float)(lines[i][0] - lines[i][2]))/(lines[i][1] - lines[i][3]);
-	// 	if (k > 0.3 && k < 3 && (lines[i][0] >= img_size.width / 2 || lines[i][2] >= img_size.width / 2)) // right
+	// 	if (gabor_weight_stats.at<int>(i,CC_STAT_WIDTH) >= 30 || gabor_weight_stats.at<int>(i,CC_STAT_HEIGHT) >= 30 )
 	// 	{
-	// 		num_right_line++;
-	// 	}
-	// 	else if (k > -3 && k < -0.3 && (lines[i][0] <= img_size.width / 2 || lines[i][2] <= img_size.width / 2))  // left
-	// 	{
-	// 		num_left_line++;
-	// 	}
-	// }
-	// // #ifndef NDEBUG_IN
-	// // imshow("vote_line_ori",vote_line_ori);
-	// // #endif
-
-	// // supplementary hough if one side has not line
-	// if (num_left_line == 0)
-	// {
-	// 	Mat gabor_weight_8U_nms_left(gabor_resp_dir.size(), CV_8UC1, Scalar(0));
-	// 	gabor_weight_8U_nms_left.colRange(0, img_size.width/2) = gabor_weight_8U_nms.colRange(0, img_size.width/2) + 0;
-	// 	vector<Vec4i> lines_left;
-	// 	HoughLinesP(gabor_weight_8U_nms_left, lines_left, rho, theta, threshol, minLineLength, maxLineGap );
-	// 	lines.insert(lines.end(), lines_left.begin(), lines_left.end() );
-	// 	cout << "left lines extracted seperately. " << endl;
-	// }
-	// if (num_right_line == 0)
-	// {
-	// 	Mat gabor_weight_8U_nms_right(gabor_resp_dir.size(), CV_8UC1, Scalar(0));
-	// 	gabor_weight_8U_nms_right.colRange(img_size.width/2, img_size.width) = gabor_weight_8U_nms.colRange(img_size.width/2, img_size.width) + 0;
-	// 	vector<Vec4i> lines_right;
-	// 	HoughLinesP(gabor_weight_8U_nms_right, lines_right, rho, theta, threshol, minLineLength, maxLineGap );
-	// 	lines.insert(lines.end(), lines_right.begin(), lines_right.end() );
-	// 	cout << "right lines extracted seperately. " << endl;
-	// }
-
-	// #else     // using cluster+fit
-
-	// Mat gabor_weight_cluster_label, gabor_weight_stats, gabor_weight_center;
-	// int num_cluster = connectedComponentsWithStats(gabor_weight_8U, gabor_weight_cluster_label, gabor_weight_stats, gabor_weight_center);
-	// vector<Vec4i> lines;
-	// cout << "finish clustering" << endl;
-	// // for (int i = 1; i < num_cluster; i++) 		// finding best point-pair
-	// // {
-	// // 	if (gabor_weight_stats.at<int>(i,CC_STAT_WIDTH) >= 30 || gabor_weight_stats.at<int>(i,CC_STAT_HEIGHT) >= 30 )
-	// // 	{
-	// // 		Mat current_label_mask = gabor_weight_cluster_label == i;
-	// // 		vector<Point> locations;   // output, locations of non-zero pixels
-	// // 		findNonZero(current_label_mask, locations);
-	// // 		Mat line_mask(img_size, CV_8UC1, Scalar(0));
-	// // 		Mat line_overlay(img_size, CV_8UC1, Scalar(0));
-	// // 		valarray<float> length(0.0, locations.size());
-	// // 		valarray<int> end_idx(0, locations.size());
-	// // 		float max_length = 0;
-	// // 		int max_start_idx = 0;
-	// // 		for (int j = 0; j < locations.size(); j+=3 )
-	// // 		{
-	// // 			float max_length_cur_start = 0;
-	// // 			int max_pt_end_idx = j;
-	// // 			for (int k = locations.size()-1; k >= j; k-=3)
-	// // 			{
-	// // 				float line_length = sqrt((locations[j].x - locations[k].x)*(locations[j].x - locations[k].x) + (locations[j].y - locations[k].y)*(locations[j].y - locations[k].y) );
-	// // 				if (line_length > max_length_cur_start)
-	// // 				{
-	// // 					line_mask.setTo(0);
-	// // 					line(line_mask, locations[j], locations[k], Scalar(255));
-	// // 					line_overlay = current_label_mask & line_mask;
-	// // 					float overlay_length = countNonZero(line_overlay);
-	// // 					if (overlay_length/ line_length > 0.9)
-	// // 					{
-	// // 						max_length_cur_start = line_length;
-	// // 						max_pt_end_idx = k;
-	// // 					}
-	// // 				}					
-	// // 			}
-	// // 			length[j] = max_length_cur_start;
-	// // 			end_idx[j] = max_pt_end_idx;
-	// // 			if (length[j] > max_length)
-	// // 			{
-	// // 				max_length = length[j];
-	// // 				max_start_idx = j;
-	// // 			}
-	// // 		}
-	// // 		lines.push_back(Vec4i(locations[max_start_idx].x, locations[max_start_idx].y, locations[end_idx[max_start_idx]].x, locations[end_idx[max_start_idx]].y ));
-	// // 		line(gabor_weight_8U_nms, locations[max_start_idx], locations[end_idx[max_start_idx]], Scalar(255));
-	// // 	}
-	// // }
-	// for (int i = 1; i < num_cluster; i++) // use fitline
-	// {
-	// 	float width_clus = gabor_weight_stats.at<int>(i,CC_STAT_WIDTH);
-	// 	float height_clus = gabor_weight_stats.at<int>(i,CC_STAT_HEIGHT);
-	// 	float left_clus = gabor_weight_stats.at<int>(i,CC_STAT_LEFT);
-	// 	float top_clus = gabor_weight_stats.at<int>(i,CC_STAT_TOP );
-	// 	if ((width_clus >= 30 && height_clus/width_clus > 0.2 )|| height_clus >= 30 || (width_clus >= 20 && height_clus >= 20))
-	// 	{
+	// 		Mat current_label_mask = gabor_weight_cluster_label == i;
+	// 		vector<Point> locations;   // output, locations of non-zero pixels
+	// 		findNonZero(current_label_mask, locations);
 	// 		Mat line_mask(img_size, CV_8UC1, Scalar(0));
 	// 		Mat line_overlay(img_size, CV_8UC1, Scalar(0));
-	// 		Mat current_label_mask = gabor_weight_cluster_label == i;
-	// 		Mat current_label_mask_cut(img_size, CV_8UC1, Scalar(0));
-	// 		int top_cut = top_clus;
-	// 		float max_overlay_rate = 0;
-	// 		for (int j = 1; j <= 2; j ++)
+	// 		valarray<float> length(0.0, locations.size());
+	// 		valarray<int> end_idx(0, locations.size());
+	// 		float max_length = 0;
+	// 		int max_start_idx = 0;
+	// 		for (int j = 0; j < locations.size(); j+=3 )
 	// 		{
-	// 			cout << "cluster # " << i << endl;
-	// 			line_mask.setTo(0);
-	// 			current_label_mask_cut.setTo(0);
-	// 			current_label_mask_cut.rowRange(top_cut, top_clus + height_clus) = current_label_mask.rowRange(top_cut, top_clus + height_clus) + 0;
-	// 			vector<Point> locations;   // output, locations of non-zero pixels
-	// 			findNonZero(current_label_mask_cut, locations);
-	// 			Vec4f line_polar;
-	// 			fitLine(locations, line_polar, CV_DIST_L2, 0, 0.01, 0.01);
-	// 			if(abs(line_polar[1]/line_polar[0]) > 0.2)
+	// 			float max_length_cur_start = 0;
+	// 			int max_pt_end_idx = j;
+	// 			for (int k = locations.size()-1; k >= j; k-=3)
 	// 			{
-	// 				int start_y = top_cut;
-	// 				int start_x = line_polar[2] + line_polar[0]/line_polar[1]*(top_cut - line_polar[3]);
-	// 				int end_y = top_clus + height_clus;
-	// 				int end_x = line_polar[2] + line_polar[0]/line_polar[1]*(top_clus + height_clus - line_polar[3]);
-	// 				Vec4i line_curr(start_x,start_y,end_x,end_y);
-	// 				line(line_mask, Point(start_x, start_y), Point(end_x, end_y), Scalar(255));
-	// 				line_overlay = current_label_mask_cut & line_mask;
-	// 				float overlay_length = countNonZero(line_overlay);
-	// 				float line_length = sqrt((start_x - end_x)*(start_x - end_x) + (start_y - end_y)*(start_y - end_y));
-	// 				cout << "overlay: " << overlay_length << " , line: " << line_length << endl;
-	// 				float overlay_rate = overlay_length/ line_length;
-	// 				if (overlay_length/line_length > 0.9)
+	// 				float line_length = sqrt((locations[j].x - locations[k].x)*(locations[j].x - locations[k].x) + (locations[j].y - locations[k].y)*(locations[j].y - locations[k].y) );
+	// 				if (line_length > max_length_cur_start)
 	// 				{
-	// 					lines.push_back(Vec4i(start_x, start_y, end_x, end_y));
-	// 					line(gabor_weight_8U_nms,Point(start_x, start_y), Point(end_x, end_y), Scalar(255));
-	// 					break;
-	// 				}
-	// 				else if(j==1)
-	// 				{
-	// 					top_cut = top_clus + height_clus - (top_clus + height_clus - top_cut)*0.7;
-	// 					max_overlay_rate = overlay_rate;
-	// 					lines.push_back(Vec4i(start_x, start_y, end_x, end_y));
-	// 				}
-	// 				else
-	// 				{
-	// 					if (overlay_rate > max_overlay_rate)
+	// 					line_mask.setTo(0);
+	// 					line(line_mask, locations[j], locations[k], Scalar(255));
+	// 					line_overlay = current_label_mask & line_mask;
+	// 					float overlay_length = countNonZero(line_overlay);
+	// 					if (overlay_length/ line_length > 0.9)
 	// 					{
-	// 						lines.pop_back();
-	// 						lines.push_back(Vec4i(start_x, start_y, end_x, end_y));
-	// 						line(gabor_weight_8U_nms,Point(start_x, start_y), Point(end_x, end_y), Scalar(255));
+	// 						max_length_cur_start = line_length;
+	// 						max_pt_end_idx = k;
 	// 					}
-	// 					else
-	// 					{
-	// 						Vec4i last_vec4i = lines.back();
-	// 						line(gabor_weight_8U_nms,Point(last_vec4i[0], last_vec4i[1]), Point(last_vec4i[2], last_vec4i[3]), Scalar(255));
-	// 					}
-	// 				}
+	// 				}					
 	// 			}
-	// 			else
-	// 			{break;}
+	// 			length[j] = max_length_cur_start;
+	// 			end_idx[j] = max_pt_end_idx;
+	// 			if (length[j] > max_length)
+	// 			{
+	// 				max_length = length[j];
+	// 				max_start_idx = j;
+	// 			}
 	// 		}
-			
-			
+	// 		lines.push_back(Vec4i(locations[max_start_idx].x, locations[max_start_idx].y, locations[end_idx[max_start_idx]].x, locations[end_idx[max_start_idx]].y ));
+	// 		line(gabor_weight_8U_nms, locations[max_start_idx], locations[end_idx[max_start_idx]], Scalar(255));
 	// 	}
 	// }
-
-	// // imshow("gabor_weight_8U", gabor_weight_8U);
-	// // imshow("gabor_weight_8U_nms",gabor_weight_8U_nms);
-	// // waitKey(0);
-	
-	// #endif
-
-	// // vote based on lines extracted
-	// Mat vote_left(gabor_resp_dir.size(), CV_32FC1, Scalar(0));
-	// Mat vote_right(gabor_resp_dir.size(), CV_32FC1, Scalar(0));
-	// Mat vote_line(gabor_resp_dir.size(), CV_32FC1, Scalar(0));
-	// float y_bottom_left = 0, y_bottom_right= 0;
-	// for (int i = 0; i < lines.size(); i++)
-	// {
-	// 	float x1 = lines[i][0];
-	// 	float y1 = lines[i][1];
-	// 	float x2 = lines[i][2];
-	// 	float y2 = lines[i][3];
-	// 	double w = 0; //(abs(x1-x2) +abs(y1-y2)); // accumulative weight
-	// 	float k = (x1-x2)/(y1-y2);
-		
-	// 	if (abs(k) < 0.3 || abs(k) > 3 )
-	// 	{
-	// 		line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
-	// 		continue;
-	// 	}
-	// 	float x0, y0; // find lower point
-	// 	if (y1 > y2)
-	// 	{
-	// 		x0 = x1;
-	// 		y0 = y1;
-	// 	}
-	// 	else
-	// 	{
-	// 		x0 = x2;
-	// 		y0 = y2;
-	// 	}
-	// 	if (k > 0) 	// right
-	// 	{
-	// 		if (x0 < img_size.width / 2)
-	// 		{
-	// 			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
-	// 			continue;
-	// 		}
-	// 		for (int j = 0; j < y0 ; j++ )
-	// 		{
-	// 			int x_cur = x0 - k*j;
-	// 			int y_cur = y0 - j;
-	// 			if (x_cur > img_size.width - 1 || x_cur < 0)
-	// 				break;
-	// 			// w += gabor_weight.at<float>(y_cur, x_cur);
-	// 			w += gabor_weight_8U.at<uchar>(y_cur, x_cur);
-	// 			vote_right.at<float>(y_cur, x_cur)+= w;
-	// 		}
-	// 		if (x0 + k*(y_bottom_warp_max - y0)> img_size.width - 1) // not approaching bottom
-	// 		{
-	// 			float lower_y = y0 + (img_size.width - 1 - x0)/k;
-	// 			if (lower_y > y_bottom_right)
-	// 				y_bottom_right = lower_y;
-	// 		}
-	// 		else
-	// 			y_bottom_right = y_bottom_warp_max;
-	// 		line(vote_line, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255), 1);
-	// 		line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 1);
-			
-	// 		lines_vote.push_back(lines[i]);
-	// 	}
-	// 	else // left
-	// 	{
-	// 		if (x0 > img_size.width / 2)
-	// 		{
-	// 			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
-	// 			continue;
-	// 		}
-	// 		for (int j = 0; j < y0 ; j++ )
-	// 		{
-	// 			int x_cur = x0 - k*j;
-	// 			int y_cur = y0 - j;
-	// 			if (x_cur > img_size.width - 1 || x_cur < 0)
-	// 				break;
-	// 			// w += gabor_weight.at<float>(y_cur, x_cur);
-	// 			w += gabor_weight_8U.at<uchar>(y_cur, x_cur);
-	// 			vote_left.at<float>(y_cur, x_cur)+= w;
-	// 		}
-	// 		if (x0 + k*(y_bottom_warp_max - y0)< 0) // not approaching bottom
-	// 		{
-	// 			float lower_y = y0 + (0 - x0)/k;
-	// 			if (lower_y > y_bottom_left)
-	// 				y_bottom_left = lower_y;
-	// 		}
-	// 		else
-	// 			y_bottom_left = y_bottom_warp_max;
-	// 		line(vote_line, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255), 1);
-	// 		line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 1);
-
-	// 		lines_vote.push_back(lines[i]);
-	// 	}
-	// }
-
-	// if ((y_bottom_left != y_bottom_warp_max || y_bottom_right != y_bottom_warp_max ) && y_bottom_left != 0 && y_bottom_right != 0)
-	// {
-	// 	y_bottom_warp = min(y_bottom_left, y_bottom_right);
-	// }
-
-	// // vote_left and right need blurring, because the line is not strictly continuous 
-	// GaussianBlur(vote_left, vote_left, Size(3,3), 1.5, 1.5 );
-	// GaussianBlur(vote_right, vote_right, Size(3,3), 1.5, 1.5 );
-	
-	
-
-	// vote_map = 2*vote_left.mul(vote_right)/(vote_left + vote_right);
-	// Point van_pt_candi;
-	// double maxval;
-	// minMaxLoc(vote_map, NULL, &maxval, NULL, &van_pt_candi);
-	// if (maxval > 0)
-    // {
-	// 	van_pt_ini = Point2f(van_pt_candi);
-	// 	cout << "maxval of vote: " << maxval << endl;
-	// }
-	// else
-	// {
-	// 	cout << "no enough vote" << endl;
-	// 	return false;
-	// }
-
-	// #ifndef NDEBUG_IN
-	// int thickness = -1;
-	// Mat show_garbor;
-	// normalize(vote_left+vote_right, show_garbor, 0, 255, NORM_MINMAX, CV_8U);
-	// circle(show_garbor, Point(van_pt_ini), 5, Scalar( 255), thickness);
-	// imshow("vote_left_right", show_garbor);
-	// // imshow("vote_left", vote_left);
-	// // imshow("vote_right", vote_right);
-	// normalize(gabor_weight, show_garbor, 0, 255, NORM_MINMAX, CV_8U);
-	// circle(show_garbor, Point(van_pt_ini), 5, Scalar( 255), thickness);
-	// imshow("gabor_weight", show_garbor);
-	// circle(vote_line, Point(van_pt_ini), 5, Scalar( 255), thickness);
-	// imshow("vote_line", vote_line);
-	// normalize(gabor_weight_8U, show_garbor, 0, 255, NORM_MINMAX, CV_8U);
-	// circle(show_garbor, Point(van_pt_ini), 5, Scalar( 255), thickness);
-	// imshow("gabor_weight_8U", gabor_weight_8U);
-	// normalize(gabor_weight_8U_nms, show_garbor, 0, 255, NORM_MINMAX, CV_8U);
-	// circle(show_garbor, Point(van_pt_ini), 5, Scalar( 255), thickness);
-	// imshow("gabor_weight_8U_nms", gabor_weight_8U_nms);
-	// // waitKey(0);
-	// #endif
-
-	//////////////////////**********************************************/////// (un)comment above, between texture_line_based and texture_based
-
-	Mat gabor_vote_l(gabor_resp_dir.size(), CV_32FC1, Scalar(0)); 	// vote based on all pixels
-	Mat gabor_vote_r(gabor_resp_dir.size(), CV_32FC1, Scalar(0));
-	for (int i = gabor_resp_dir.rows/2; i < y_bottom_warp_max; i+=3)
+	for (int i = 1; i < num_cluster; i++) // use fitline
 	{
-		for (int j = 0; j < gabor_resp_dir.cols; j+=3)
+		float width_clus = gabor_weight_stats.at<int>(i,CC_STAT_WIDTH);
+		float height_clus = gabor_weight_stats.at<int>(i,CC_STAT_HEIGHT);
+		float left_clus = gabor_weight_stats.at<int>(i,CC_STAT_LEFT);
+		float top_clus = gabor_weight_stats.at<int>(i,CC_STAT_TOP );
+		if ((width_clus >= 30 && height_clus/width_clus > 0.2 )|| height_clus >= 30 || (width_clus >= 20 && height_clus >= 20))
 		{
-			float cur_weight = gabor_weight.at<float>(i,j);
-			if (cur_weight <= 0)
+			Mat line_mask(img_size, CV_8UC1, Scalar(0));
+			Mat line_overlay(img_size, CV_8UC1, Scalar(0));
+			Mat current_label_mask = gabor_weight_cluster_label == i;
+			Mat current_label_mask_cut(img_size, CV_8UC1, Scalar(0));
+			int top_cut = top_clus;
+			float max_overlay_rate = 0;
+			for (int j = 1; j <= 2; j ++)
 			{
-				continue;
-			}
-			float tan_angle = tan(gabor_resp_dir.at<float>(i, j));
-			if (tan_angle > 0)
-			{
-				for (int y = i - 1; y > gabor_resp_dir.rows / 4; y-- )
+				cout << "cluster # " << i << endl;
+				line_mask.setTo(0);
+				current_label_mask_cut.setTo(0);
+				current_label_mask_cut.rowRange(top_cut, top_clus + height_clus) = current_label_mask.rowRange(top_cut, top_clus + height_clus) + 0;
+				vector<Point> locations;   // output, locations of non-zero pixels
+				findNonZero(current_label_mask_cut, locations);
+				Vec4f line_polar;
+				fitLine(locations, line_polar, CV_DIST_L2, 0, 0.01, 0.01);
+				if(abs(line_polar[1]/line_polar[0]) > 0.2)
 				{
-					int x = j + (i - y) * tan_angle;
-					if (x >= gabor_resp_dir.cols || x < 0)
+					int start_y = top_cut;
+					int start_x = line_polar[2] + line_polar[0]/line_polar[1]*(top_cut - line_polar[3]);
+					int end_y = top_clus + height_clus;
+					int end_x = line_polar[2] + line_polar[0]/line_polar[1]*(top_clus + height_clus - line_polar[3]);
+					Vec4i line_curr(start_x,start_y,end_x,end_y);
+					line(line_mask, Point(start_x, start_y), Point(end_x, end_y), Scalar(255));
+					line_overlay = current_label_mask_cut & line_mask;
+					float overlay_length = countNonZero(line_overlay);
+					float line_length = sqrt((start_x - end_x)*(start_x - end_x) + (start_y - end_y)*(start_y - end_y));
+					cout << "overlay: " << overlay_length << " , line: " << line_length << endl;
+					float overlay_rate = overlay_length/ line_length;
+					if (overlay_length/line_length > 0.9)
 					{
+						lines.push_back(Vec4i(start_x, start_y, end_x, end_y));
+						line(gabor_weight_8U_nms,Point(start_x, start_y), Point(end_x, end_y), Scalar(255));
 						break;
 					}
-					gabor_vote_l.at<float>(y, x) += cur_weight;//*(1-(float)(i-y)/(i-gabor_resp_dir.rows/4)*(i-y)/(i-gabor_resp_dir.rows/4));
-				}
-			}
-			else
-			{
-				for (int y = i - 1; y > gabor_resp_dir.rows / 4; y-- )
-				{
-					int x = j + (i - y) * tan_angle;
-					if (x >= gabor_resp_dir.cols || x < 0)
+					else if(j==1)
 					{
-						break;
+						top_cut = top_clus + height_clus - (top_clus + height_clus - top_cut)*0.7;
+						max_overlay_rate = overlay_rate;
+						lines.push_back(Vec4i(start_x, start_y, end_x, end_y));
 					}
-					gabor_vote_r.at<float>(y, x) += cur_weight;//*(1-(float)(i-y)/(i-gabor_resp_dir.rows/4)*(i-y)/(i-gabor_resp_dir.rows/4));
+					else
+					{
+						if (overlay_rate > max_overlay_rate)
+						{
+							lines.pop_back();
+							lines.push_back(Vec4i(start_x, start_y, end_x, end_y));
+							line(gabor_weight_8U_nms,Point(start_x, start_y), Point(end_x, end_y), Scalar(255));
+						}
+						else
+						{
+							Vec4i last_vec4i = lines.back();
+							line(gabor_weight_8U_nms,Point(last_vec4i[0], last_vec4i[1]), Point(last_vec4i[2], last_vec4i[3]), Scalar(255));
+						}
+					}
 				}
+				else
+				{break;}
 			}
+			
 			
 		}
 	}
-	Mat gabor_vote = 2*gabor_vote_l.mul(gabor_vote_r)/(gabor_vote_l + gabor_vote_r);
+
+	// imshow("gabor_weight_8U", gabor_weight_8U);
+	// imshow("gabor_weight_8U_nms",gabor_weight_8U_nms);
+	// waitKey(0);
+	
+	#endif
+
+	// vote based on lines extracted
+	Mat vote_left(gabor_resp_dir.size(), CV_32FC1, Scalar(0));
+	Mat vote_right(gabor_resp_dir.size(), CV_32FC1, Scalar(0));
+	Mat vote_line(gabor_resp_dir.size(), CV_32FC1, Scalar(0));
+	float y_bottom_left = 0, y_bottom_right= 0;
+	for (int i = 0; i < lines.size(); i++)
+	{
+		float x1 = lines[i][0];
+		float y1 = lines[i][1];
+		float x2 = lines[i][2];
+		float y2 = lines[i][3];
+		double w = 0; //(abs(x1-x2) +abs(y1-y2)); // accumulative weight
+		float k = (x1-x2)/(y1-y2);
+		
+		if (abs(k) < 0.3 || abs(k) > 3 )
+		{
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
+			continue;
+		}
+		float x0, y0; // find lower point
+		if (y1 > y2)
+		{
+			x0 = x1;
+			y0 = y1;
+		}
+		else
+		{
+			x0 = x2;
+			y0 = y2;
+		}
+		if (k > 0) 	// right
+		{
+			if (x0 < img_size.width / 2)
+			{
+				line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
+				continue;
+			}
+			for (int j = 0; j < y0 ; j++ )
+			{
+				int x_cur = x0 - k*j;
+				int y_cur = y0 - j;
+				if (x_cur > img_size.width - 1 || x_cur < 0)
+					break;
+				// w += gabor_weight.at<float>(y_cur, x_cur);
+				w += gabor_weight_8U.at<uchar>(y_cur, x_cur);
+				vote_right.at<float>(y_cur, x_cur)+= w;
+			}
+			if (x0 + k*(y_bottom_warp_max - y0)> img_size.width - 1) // not approaching bottom
+			{
+				float lower_y = y0 + (img_size.width - 1 - x0)/k;
+				if (lower_y > y_bottom_right)
+					y_bottom_right = lower_y;
+			}
+			else
+				y_bottom_right = y_bottom_warp_max;
+			line(vote_line, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255), 1);
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 1);
+			
+			lines_vote.push_back(lines[i]);
+		}
+		else // left
+		{
+			if (x0 > img_size.width / 2)
+			{
+				line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0), 1);
+				continue;
+			}
+			for (int j = 0; j < y0 ; j++ )
+			{
+				int x_cur = x0 - k*j;
+				int y_cur = y0 - j;
+				if (x_cur > img_size.width - 1 || x_cur < 0)
+					break;
+				// w += gabor_weight.at<float>(y_cur, x_cur);
+				w += gabor_weight_8U.at<uchar>(y_cur, x_cur);
+				vote_left.at<float>(y_cur, x_cur)+= w;
+			}
+			if (x0 + k*(y_bottom_warp_max - y0)< 0) // not approaching bottom
+			{
+				float lower_y = y0 + (0 - x0)/k;
+				if (lower_y > y_bottom_left)
+					y_bottom_left = lower_y;
+			}
+			else
+				y_bottom_left = y_bottom_warp_max;
+			line(vote_line, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(255), 1);
+			line(vote_lines_img, Point(lines[i][0], lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,0,255), 1);
+
+			lines_vote.push_back(lines[i]);
+		}
+	}
+
+	if ((y_bottom_left != y_bottom_warp_max || y_bottom_right != y_bottom_warp_max ) && y_bottom_left != 0 && y_bottom_right != 0)
+	{
+		y_bottom_warp = min(y_bottom_left, y_bottom_right);
+	}
+
+	// vote_left and right need blurring, because the line is not strictly continuous 
+	GaussianBlur(vote_left, vote_left, Size(3,3), 1.5, 1.5 );
+	GaussianBlur(vote_right, vote_right, Size(3,3), 1.5, 1.5 );
+	
+	
+
+	vote_map = 2*vote_left.mul(vote_right)/(vote_left + vote_right);
 	Point van_pt_candi;
-	minMaxLoc(gabor_vote, NULL, NULL, NULL, &van_pt_candi);
-	van_pt_ini = Point2f(van_pt_candi);
+	double maxval;
+	minMaxLoc(vote_map, NULL, &maxval, NULL, &van_pt_candi);
+	if (maxval > 0)
+    {
+		van_pt_ini = Point2f(van_pt_candi);
+		cout << "maxval of vote: " << maxval << endl;
+	}
+	else
+	{
+		cout << "no enough vote" << endl;
+		return false;
+	}
+
+	int thickness = ini_success ? -1:2;
+	#ifndef NDEBUG_IN
+	Mat show_garbor;
+	normalize(vote_left+vote_right, show_garbor, 0, 255, NORM_MINMAX, CV_8U);
+	circle(show_garbor, Point(van_pt_ini), 5, Scalar( 255), thickness);
+	imshow("vote_left_right", show_garbor);
+	// imshow("vote_left", vote_left);
+	// imshow("vote_right", vote_right);
+	normalize(gabor_weight, show_garbor, 0, 255, NORM_MINMAX, CV_8U);
+	circle(show_garbor, Point(van_pt_ini), 5, Scalar( 255), thickness);
+	imshow("gabor_weight", show_garbor);
+	circle(vote_line, Point(van_pt_ini), 5, Scalar( 255), thickness);
+	imshow("vote_line", vote_line);
+	normalize(gabor_weight_8U, show_garbor, 0, 255, NORM_MINMAX, CV_8U);
+	circle(show_garbor, Point(van_pt_ini), 5, Scalar( 255), thickness);
+	imshow("gabor_weight_8U", gabor_weight_8U);
+	normalize(gabor_weight_8U_nms, show_garbor, 0, 255, NORM_MINMAX, CV_8U);
+	circle(show_garbor, Point(van_pt_ini), 5, Scalar( 255), thickness);
+	imshow("gabor_weight_8U_nms", gabor_weight_8U_nms);
+	// waitKey(0);
+	#endif
+
+	// Mat gabor_vote_l(gabor_resp_dir.size(), CV_32FC1, Scalar(0)); 	// vote based on all pixels
+	// Mat gabor_vote_r(gabor_resp_dir.size(), CV_32FC1, Scalar(0));
+	// for (int i = gabor_resp_dir.rows/2; i < y_bottom_warp_max; i+=3)
+	// {
+	// 	for (int j = 0; j < gabor_resp_dir.cols; j+=3)
+	// 	{
+	// 		float cur_weight = gabor_weight.at<float>(i,j);
+	// 		if (cur_weight <= 0)
+	// 		{
+	// 			continue;
+	// 		}
+	// 		float tan_angle = tan(gabor_resp_dir.at<float>(i, j));
+	// 		if (tan_angle > 0)
+	// 		{
+	// 			for (int y = i - 1; y > gabor_resp_dir.rows / 4; y-- )
+	// 			{
+	// 				int x = j + (i - y) * tan_angle;
+	// 				if (x >= gabor_resp_dir.cols || x < 0)
+	// 				{
+	// 					break;
+	// 				}
+	// 				gabor_vote_l.at<float>(y, x) += cur_weight;//*(1-(float)(i-y)/(i-gabor_resp_dir.rows/4)*(i-y)/(i-gabor_resp_dir.rows/4));
+	// 			}
+	// 		}
+	// 		else
+	// 		{
+	// 			for (int y = i - 1; y > gabor_resp_dir.rows / 4; y-- )
+	// 			{
+	// 				int x = j + (i - y) * tan_angle;
+	// 				if (x >= gabor_resp_dir.cols || x < 0)
+	// 				{
+	// 					break;
+	// 				}
+	// 				gabor_vote_r.at<float>(y, x) += cur_weight;//*(1-(float)(i-y)/(i-gabor_resp_dir.rows/4)*(i-y)/(i-gabor_resp_dir.rows/4));
+	// 			}
+	// 		}
+			
+	// 	}
+	// }
+	// gabor_vote = 2*gabor_vote_l.mul(gabor_vote_r)/(gabor_vote_l + gabor_vote_r);
+	// Point van_pt_candi;
+	// minMaxLoc(gabor_vote, NULL, NULL, NULL, &van_pt_candi);
+	// van_pt_ini = Point2f(van_pt_candi);
 
 	// Mat show_garbor;
 	// normalize(gabor_vote, show_garbor, 0, 255, NORM_MINMAX, CV_8U);
@@ -1274,13 +1263,6 @@ bool VanPt::GaborVote(Mat gabor_resp_dir, Mat gabor_weight, Mat& vote_map, Mat e
 	// circle(show_garbor, van_pt_candi, 5, Scalar( 255), -1);
 	// imshow("gabor_weight", show_garbor);
 	// waitKey(0);
-
-	//////////////////////**********************************************/////// (un)comment above, between texture_line_based and texture_based
-
-
-	theta_w = atan(tan(ALPHA_W)*((van_pt_ini.x - img_size.width/2)/(img_size.width/2))); 	// yaw angle 
-	theta_h = atan(tan(ALPHA_H)*((van_pt_ini.y - img_size.height/2)/(img_size.height/2)));	// pitch angle
-
 
 	return true;
 }
@@ -1438,12 +1420,7 @@ void VanPt::NMS(Mat matrix, Mat& matrix_nms)
 void outputVideo(Mat image, Mat warped_img, VideoWriter& writer, const VanPt& van_pt, int& nframe)
 {
 	// add vanishing point related info to the image (draw the lines_vote)
-	// Mat vote_lines_img_gray, vote_lines_img_merge(img_size, CV_8UC3);
-	// cvtColor(van_pt.vote_lines_img, vote_lines_img_gray, COLOR_BGR2GRAY);
-	// int from_to[] = { 0,0, 0,1, 0,2};
-	// mixChannels( &vote_lines_img_gray, 1, &vote_lines_img_merge, 1, from_to, 3 );
-	// van_pt.vote_lines_img.copyTo(image, vote_lines_img_merge);
-	addWeighted(image, 1, van_pt.vote_lines_img, 0.5, 0, image);
+	addWeighted(image, 1, van_pt.vote_lines_img, 0.4, 0, image);
 
 	// add the warp image to the corner
 	Mat small_lane_window_out_img;
