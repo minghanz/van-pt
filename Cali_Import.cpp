@@ -149,20 +149,22 @@ void import(int argc, char** argv, string& file_name, Mat& image, VideoCapture& 
 		
 		if (argc == 4)
 		{
-			msc[0] = (int)strtol(argv[3], NULL, 10);
+			// msc[0] = (int)strtol(argv[3], NULL, 10);
+			msc[0] = 0;
 			msc[1] = (int)strtol(argv[3], NULL, 10);
-			reader.set(CAP_PROP_POS_MSEC, msc[0]);  
+			// reader.set(CAP_PROP_POS_MSEC, msc[0]);  // if argc==4, only set end time
 		}
 		else if (argc == 5)
 		{
 			msc[0] = (int)strtol(argv[3], NULL, 10);
 			msc[1] = (int)strtol(argv[4], NULL, 10);
-			reader.set(CAP_PROP_POS_MSEC, msc[0]);  
+			// reader.set(CAP_PROP_POS_MSEC, msc[0]);  
+			reader.set(CV_CAP_PROP_POS_FRAMES, msc[0]);  // set nframe instead of time in ms
 		}
 		else
 		{
-			msc[0] = -1;
-			msc[1] = -1;
+			msc[0] = 0;
+			msc[1] = 0;
 		}
 	}
 	else
@@ -199,6 +201,7 @@ string x2str(bool num)
 
 void illuComp(Mat& raw_img, Mat& gray, float& illu_comp)
 {
+
 	int mode = 2; // 1: top 5%; 2: 20%-80% sample 10%
 	
 	/// histogram for reference white
@@ -228,6 +231,7 @@ void illuComp(Mat& raw_img, Mat& gray, float& illu_comp)
 	#else
 	float total_pix = gray.rows * gray.cols/10*2 ; // for caltech data
 	#endif
+
 	
 	if (mode == 1)
 	{
@@ -287,5 +291,6 @@ void illuComp(Mat& raw_img, Mat& gray, float& illu_comp)
 	imshow("image after compen", raw_img);
 	// waitKey(0);
 	#endif
+
 	return;
 }

@@ -153,3 +153,73 @@ bool VanPt::edgeVote(Mat image, Mat edges) // the original version as in 4
 
 	return true;
 }
+
+int VanPt::checkValidLine(Vec4i line)
+{
+	Point2f ref_pt = van_pt_ini; // van_pt_cali
+
+	// threshold parameters
+	float length_thre_far = 10;
+	float length_thre_near = 25;
+	float k_thre_min_large = 0.3;
+	float k_thre_min_small = 0.1;
+	float k_thre_max_large = 5;
+	float k_thre_max_small = 1;
+	// float dist_top_thre = (y_bottom_warp_max - van_pt_cali.y)*1/6;
+
+	// basic information of current line segment
+	float x1 = line[0];
+	float y1 = line[1];
+	float x2 = line[2];
+	float y2 = line[3];
+
+	float length = sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
+	float k = (y2-y1)/(x2-x1+0.00001);
+
+	// 1. check side
+	float vx = ref_pt.x - img_size.width/2;
+	float vy = ref_pt.y - (img_size.height-1); // should < 0
+	float nx = -vy;
+	float ny = vx;
+	float x_m = (x1+x2)/2 - ref_pt.x;
+	float y_m = (y1+y2)/2 - ref_pt.y;
+	int side = x_m*nx + y_m*ny > 0 ? 2 : 1; // right:2, left:1
+
+	bool valid_side = (side == 1 && k < 0 ) || (side == 2 && k > 0);
+	if (!valid_side)
+	{
+		return 0;
+	}
+	
+	// 2. check length
+	float y_bottom = y1>y2 ? y1 : y2;
+	float x_side = abs(x1 - ref_pt.x) > abs(x2 - ref_pt.x) ? abs(x1 - ref_pt.x) : abs(x2 - ref_pt.x);
+	float length_thre_cur = (y_bottom - ref_pt.y)/(y_bottom_warp_max - ref_pt.y)*(length_thre_near - length_thre_far) + length_thre_far;
+	
+	bool valid_length = length >= length_thre_cur;
+	if (!valid_length)
+	{
+		return 3;
+	}
+	
+	// 3. check slope
+	float k_thre_min_cur_verti = (y_bottom - ref_pt.y)/(y_bottom_warp_max - ref_pt.y)*(k_thre_min_large - k_thre_min_small) + k_thre_min_small;
+	float k_thre_min_cur_hori = x_side / (img_size.width/2)*(k_thre_min_small - k_thre_min_large) + k_thre_min_large;
+	float k_thre_min_cur = (k_thre_min_cur_verti + k_thre_min_cur_hori)/2;
+
+	float k_thre_max_cur_verti = (y_bottom - ref_pt.y)/(y_bottom_warp_max - ref_pt.y)*(k_thre_max_large - k_thre_max_small) + k_thre_max_small;
+	float k_thre_max_cur_hori = x_side / (img_size.width/2)*(k_thre_max_small - k_thre_max_large) + k_thre_max_large;
+	float k_thre_max_cur = (k_thre_max_cur_verti + k_thre_max_cur_hori)/2;
+
+	bool valid_angle = abs(k) >= k_thre_min_cur && abs(k) <= k_thre_max_cur;
+	if (!valid_angle)
+	{
+		return 4;
+	}
+	else
+	{
+		return side;
+	}
+
+}
+

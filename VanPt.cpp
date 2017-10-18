@@ -91,6 +91,7 @@ VanPt::VanPt(float alpha_w, float alpha_h) : ALPHA_W(alpha_w), ALPHA_H(alpha_h)
 
 void VanPt::initialVan(Mat color_img, Mat image, Mat& warped_img)
 {
+
 	lines_vote.clear();
 	vote_lines_img.setTo(Scalar(0,0,0));
 
@@ -100,29 +101,27 @@ void VanPt::initialVan(Mat color_img, Mat image, Mat& warped_img)
 	// #ifndef NDEBUG_IN
 	// imshow("canny", edges);
 	// #endif
-	
-	
 
-	Mat sobel_x, sobel_y, sobel_angle;
-	Sobel(image, sobel_x, CV_32F, 1, 0, 7); // 3
-	Sobel(image, sobel_y, CV_32F, 0, 1, 7);
-	phase(sobel_x, sobel_y, sobel_angle, true);  // output of phase in degree is [0~360]
-	Mat angle_mask;
-	angle_mask = (sobel_angle >= 10 & sobel_angle <= 80) | (sobel_angle >= 100 & sobel_angle <= 170) | (sobel_angle >= 190 & sobel_angle <= 260) | (sobel_angle >= 280 & sobel_angle <= 350);
 
-	
-	bitwise_and(edges, angle_mask, edges); // remove edges with wrong angle
-	
+	// Mat sobel_x, sobel_y, sobel_angle;
+	// Sobel(image, sobel_x, CV_32F, 1, 0, 7); // 3
+	// Sobel(image, sobel_y, CV_32F, 0, 1, 7);
+	// phase(sobel_x, sobel_y, sobel_angle, true);  // output of phase in degree is [0~360]
+	// Mat angle_mask;
+	// angle_mask = (sobel_angle >= 10 & sobel_angle <= 80) | (sobel_angle >= 100 & sobel_angle <= 170) | (sobel_angle >= 190 & sobel_angle <= 260) | (sobel_angle >= 280 & sobel_angle <= 350);
+	// bitwise_and(edges, angle_mask, edges); // remove edges with wrong angle
+
 	Mat cali_mask;
 	Mat erode_kernel = getStructuringElement(MORPH_RECT, Size(7, 7) );
 	erode(image, cali_mask, erode_kernel );
 	cali_mask = cali_mask > 0;
 	bitwise_and(edges, cali_mask, edges); // remove the edges caused by warp effect
 
-	int dist_top_thre = (y_bottom_warp_max - van_pt_cali.y)*1/6; 			// may need modification: depends on cali or detect result ?
 
+	int dist_top_thre = (y_bottom_warp_max - van_pt_cali.y)*1/6; 			// may need modification: depends on cali or detect result ?
 	edges.rowRange(0, van_pt_cali.y + dist_top_thre) = 0;
 	edges.rowRange(y_bottom_warp_max, image.rows) = 0;  // for caltech data
+
 
 	#ifndef CANNY_VOTE
 	// Mat steer_resp_mag(image.size(), CV_32FC1, Scalar(0));
@@ -153,6 +152,7 @@ void VanPt::initialVan(Mat color_img, Mat image, Mat& warped_img)
 	updateTrackVar();
 
 	#endif
+
 
 	/// generate the trapezoid for warping and masking
 	float y_top_warp = (y_bottom_warp + 5*van_pt_ini.y)/6;
@@ -186,11 +186,13 @@ void VanPt::initialVan(Mat color_img, Mat image, Mat& warped_img)
 	// imshow("warped image", warped_img);
 	// #endif
 	#endif
+
 }
 
 #ifdef CANNY_VOTE
 bool VanPt::edgeVote(Mat image, Mat edges)
 {
+
 	/// vote for vanishing point based on Hough
 	vector<Vec4i> lines;
 	HoughLinesP(edges, lines, 1, CV_PI/180, 10, 10, 10 );
@@ -220,7 +222,7 @@ bool VanPt::edgeVote(Mat image, Mat edges)
 			valid_lines_idx_right.push_back(i);
 			valid_lines_w_right.push_back(getLineWeight(lines[i]));
 		}
-		#ifdef DRAW
+		#ifdef DRAW				// draw the invalid line segments
 		else if (check_result == 3)
 		{
 			line(vote_lines_img, Point(lines[i][0],lines[i][1]), Point(lines[i][2], lines[i][3]), Scalar(0,255,0),1);
@@ -241,6 +243,7 @@ bool VanPt::edgeVote(Mat image, Mat edges)
 		cout << "Initilization failed: no valid lines found. " << endl;
 		return false;
 	}
+
 
 	// find van_pt_candi and synthesize to an estimate
 	vector<Point2f> van_pt_candi;
@@ -274,10 +277,10 @@ bool VanPt::edgeVote(Mat image, Mat edges)
 			x_sum += weight_cur*xp;
 			y_sum += weight_cur*yp;
 
-			#ifdef DRAW
+			#ifdef DRAW		// draw line pairs and van_pt candidates
 			line(vote_lines_img, Point(xl1,yl1), Point(xl2, yl2), Scalar(0,0,255),1);
 			line(vote_lines_img, Point(xr1,yr1), Point(xr2, yr2), Scalar(0,0,255),1);
-			circle(vote_lines_img, Point(xp,yp), 2, Scalar(0,255,0), -1);
+			// circle(vote_lines_img, Point(xp,yp), 2, Scalar(0,255,0), -1);
 			#endif
 			
 		}
@@ -285,6 +288,7 @@ bool VanPt::edgeVote(Mat image, Mat edges)
 	// Point2f van_pt_obsv;
 	van_pt_obsv.x = x_sum/weight_sum;
 	van_pt_obsv.y = y_sum/weight_sum;
+
 
 	// get confidence
 	confidence = getConfidence(van_pt_candi, van_pt_candi_w, valid_lines_w_left, valid_lines_w_right); //, van_pt_obsv);
@@ -297,7 +301,7 @@ bool VanPt::edgeVote(Mat image, Mat edges)
 	theta_w_unfil = atan(tan(ALPHA_W)*((van_pt_obsv.x - img_size.width/2)/(img_size.width/2))); 	// yaw angle 
 	theta_h_unfil = atan(tan(ALPHA_H)*((van_pt_obsv.y - img_size.height/2)/(img_size.height/2)));	// pitch angle
 
-	// int fontFace = FONT_HERSHEY_SIMPLEX;
+	// int fontFace = FONT_HERSHEY_SIMPLEX;			// output pitch and yaw angle
 	// double fontScale = 0.5;
 	// int thickness = 1;
 	// string Text1 = "pitch: " + x2str(theta_h*180/CV_PI) + ", yaw: " + x2str(theta_w*180/CV_PI);
@@ -369,6 +373,10 @@ int VanPt::checkValidLine(Vec4i line)
 
 }
 
+
+
+
+
 float VanPt::getLineWeight(Vec4i line)
 {
 	Point2f ref_pt = van_pt_ini; //van_pt_cali
@@ -386,7 +394,7 @@ float VanPt::getLineWeight(Vec4i line)
 	float gamma_dist = 1.0/40.0, c_dist = 70;
 	float dist_weight = 0.5*(1-tanh(gamma_dist*(dist2ref - c_dist)));
 
-	#ifdef DRAW
+	#ifdef DRAW				// draw the illustration of line weights concerning distance
 	// circle(vote_lines_img, Point(ref_pt), (int)c_dist, Scalar(255,0,0));
 	// circle(vote_lines_img, Point(ref_pt), (int)c_dist + (int)(1/gamma_dist), Scalar(255,0,0));
 	#endif
@@ -470,7 +478,7 @@ float VanPt::getConfidence(const vector<Point2f>& van_pt_candi, const vector<flo
 		filter_confidence = (cur_confidence + confidence)/2;
 	}
 
-	#ifdef DRAW
+	#ifdef DRAW				// draw the observation (weighted average) of van_pt
 	circle(vote_lines_img, Point(van_pt_obsv), (int)van_pt_mse, Scalar(0,0,255));
 	circle(vote_lines_img, Point(van_pt_obsv), 5, Scalar(0,0,255), -1);
 	

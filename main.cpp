@@ -64,25 +64,29 @@ int main(int argc, char** argv)
 	clock_t t_start = clock();
 	clock_t t_0 = t_start;
 	clock_t t_1 = t_start;
+	clock_t t_a = t_start; 
+	clock_t t_b = t_start;
 	float time_step = 0; 		// counting frames, fed to LaneImage(__nframe)
 	img_size = Size(reader.get(CV_CAP_PROP_FRAME_WIDTH), reader.get(CV_CAP_PROP_FRAME_HEIGHT));
 
 	float illu_comp = 1;
 	VanPt van_pt(alpha_w, alpha_h);
-	int nframe = 0;
-	
+	int nframe = msc[0];
+
+	Mat cali_image;
+
 	while (reader.isOpened())
 	{
-		reader.read(image);
-		if(!image.empty() && (msc[1] == -1 || reader.get(CV_CAP_PROP_POS_MSEC) <= msc[1]))
+		reader.read(cali_image); // image
+		if(!cali_image.empty() && (msc[1] == 0 || nframe <= msc[1])) // image // reader.get(CV_CAP_PROP_POS_MSEC) <= msc[1]
 		{
-			cout << "current time(msc): " << reader.get(CV_CAP_PROP_POS_MSEC) << endl;
+			// cout << "current time(msc): " << reader.get(CV_CAP_PROP_POS_MSEC) << endl;
 			
 
-				Mat cali_image;
-				if (cali) { undistort(image, cali_image, cam_mtx, dist_coeff); }
-				else { image.copyTo(cali_image); } // not copied
-				
+				// Mat cali_image;			// undistortion, spend 0.015s on avearge
+				// if (cali) { undistort(image, cali_image, cam_mtx, dist_coeff); }
+				// else { image.copyTo(cali_image); } // not copied
+
 				#ifndef NDEBUG
 				// cout << "cali image size" << cali_image.size() << endl;
 				// namedWindow("original color", WINDOW_AUTOSIZE);
@@ -95,7 +99,16 @@ int main(int argc, char** argv)
 				Mat gray, warped_img;
 				cvtColor(cali_image, gray, COLOR_BGR2GRAY);
 				illuComp(cali_image, gray, illu_comp);
+
+				// t_b = clock();
+				// cout << "Image illu_compened, using: " << x2str((float)(t_b - t_a) / CLOCKS_PER_SEC) << "s. " << endl;
+				// t_a = t_b;
+
 				van_pt.initialVan(cali_image, gray, warped_img);
+
+				// t_b = clock();
+				// cout << "initialVan, using: " << x2str((float)(t_b - t_a) / CLOCKS_PER_SEC) << "s. " << endl;
+				// t_a = t_b;
 
 				#ifdef DRAW
 				outputVideo(cali_image, warped_img, writer, van_pt, nframe);
@@ -108,12 +121,12 @@ int main(int argc, char** argv)
 				// 	outfile2 << van_pt.theta_h_unfil << " " << nframe << endl;
 				// }
 				t_1 = clock();
-				cout << "Frame " << x2str(nframe) << ", using: " << x2str((float)(t_1 - t_0)) / CLOCKS_PER_SEC) << "s. " << endl;
+				cout << "Frame " << x2str(nframe-1) << ", using: " << x2str((float)(t_1 - t_0) / CLOCKS_PER_SEC) << "s. " << endl;
 				t_0 = t_1;
 		}
 		else
 		{
-			cout << "All " << x2str(nframe) << " frames processed, using " << x2str((float)(t_1 - t_start)) / CLOCKS_PER_SEC) << "s. " << endl;
+			cout << "All " << x2str(nframe-1-msc[0]) << " frames processed, using " << x2str((float)(t_1 - t_start) / CLOCKS_PER_SEC) << "s. " << endl;
 			// outfile.close();
 			// outfile2.close();
 			break;
