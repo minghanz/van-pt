@@ -479,8 +479,8 @@ float VanPt::getConfidence(const vector<Point2f>& van_pt_candi, const vector<flo
 	}
 
 	#ifdef DRAW				// draw the observation (weighted average) of van_pt
-	circle(vote_lines_img, Point(van_pt_obsv), (int)van_pt_mse, Scalar(0,0,255));
-	circle(vote_lines_img, Point(van_pt_obsv), 5, Scalar(0,0,255), -1);
+	circle(vote_lines_img, Point(van_pt_obsv), (int)van_pt_mse, Scalar(0,0,100));
+	circle(vote_lines_img, Point(van_pt_obsv), 2, Scalar(0,0,100), -1);
 	
 	rectangle(vote_lines_img, Point(ref_pt.x - c_x, ref_pt.y - c_y), Point(ref_pt.x + c_x, ref_pt.y + c_y), Scalar(255,0,0));
 	#endif
@@ -1451,7 +1451,7 @@ void outputVideo(Mat image, Mat warped_img, VideoWriter& writer, const VanPt& va
 	// int from_to[] = { 0,0, 0,1, 0,2};
 	// mixChannels( &vote_lines_img_gray, 1, &vote_lines_img_merge, 1, from_to, 3 );
 	// van_pt.vote_lines_img.copyTo(image, vote_lines_img_merge);
-	addWeighted(image, 1, van_pt.vote_lines_img, 0.5, 0, image);
+	addWeighted(image, 1, van_pt.vote_lines_img, 0.2, 0, image);
 
 	// add the warp image to the corner
 	Mat small_lane_window_out_img;
